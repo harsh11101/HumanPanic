@@ -1,0 +1,10 @@
+<!DOCTYPE aspectj PUBLIC "-//AspectJ//DTD//EN" "https://www.eclipse.org/aspectj/dtd/aspectj.dtd">
+<aspectj>
+    <weaver options="-verbose -showWeaveInfo">
+        <include within="io.pants.humanpanic..*"/>
+    </weaver>
+
+    <aspects>
+        <aspect name="io.pants.humanpanic.interceptor.HumanPanicAspect"/>
+    </aspects>
+</aspectj>
