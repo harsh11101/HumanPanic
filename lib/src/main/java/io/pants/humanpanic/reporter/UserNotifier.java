@@ -3,7 +3,6 @@ package io.pants.humanpanic.reporter;
 import io.pants.humanpanic.config.AppMetadata;
 import io.pants.humanpanic.config.ConfigLoader;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,8 +12,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class UserNotifier {
 
-    @Autowired
-    private static ConfigLoader configLoader;
+    private final ConfigLoader configLoader;
 
     public void notifyWithReport(String customMessage, String reportPath) {
         AppMetadata metadata = configLoader.getMetadata();
@@ -26,10 +24,19 @@ public class UserNotifier {
         sb.append(metadata.getName()).append(" had a problem and crashed. To help us diagnose\n");
         sb.append("the problem you can send us a crash report.\n");
         sb.append("\n");
-        sb.append("We have generated a report file at:\n");
-        sb.append("\n");
-        sb.append("  ").append(reportPath).append("\n");
-        sb.append("\n");
+
+        if (customMessage != null && !customMessage.isEmpty() && !customMessage.equals("An error occurred")) {
+            sb.append(customMessage).append("\n");
+            sb.append("\n");
+        }
+
+        if (reportPath != null) {
+            sb.append("We have generated a report file at:\n");
+            sb.append("\n");
+            sb.append("  ").append(reportPath).append("\n");
+            sb.append("\n");
+        }
+
         sb.append("Submit an issue or email with the subject of:\n");
         sb.append("\n");
         sb.append("  ").append(metadata.getName()).append(" Crash Report\n");
@@ -70,6 +77,11 @@ public class UserNotifier {
         System.err.println("Well, this is embarrassing.");
         System.err.println("\n");
         System.err.println(metadata.getName() + " encountered an error:");
+
+        if (message != null && !message.isEmpty() && !message.equals("An error occurred")) {
+            System.err.println("  " + message);
+        }
+
         System.err.println("  " + throwable.getClass().getSimpleName());
         if (throwable.getMessage() != null) {
             System.err.println("  " + throwable.getMessage());

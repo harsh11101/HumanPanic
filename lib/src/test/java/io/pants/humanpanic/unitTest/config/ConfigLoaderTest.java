@@ -5,177 +5,216 @@ import io.pants.humanpanic.config.ConfigLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for ConfigLoader using Mockito
+ * Unit tests for ConfigLoader
  */
 @ExtendWith(MockitoExtension.class)
 class ConfigLoaderTest {
 
-    @Mock
-    private ConfigLoader configLoader;
+    private AppMetadata metadata;
+
+    @BeforeEach
+    void setUp() {
+        metadata = new AppMetadata();
+    }
+
+    private ConfigLoader newLoader(
+            String name,
+            String version,
+            String authors,
+            String homepage,
+            String supportUrl,
+            String issueUrl
+    ) {
+        return new ConfigLoader(metadata, name, version, authors, homepage, supportUrl, issueUrl);
+    }
 
     @Test
     void testDefaultValues() {
-        // When no configuration is set
-        configLoader.init();
+        ConfigLoader loader = newLoader(
+                "Unknown Application",
+                "Unknown Version",
+                "Unknown Authors",
+                "",
+                "",
+                ""
+        );
+        loader.init();
 
-        AppMetadata metadata = configLoader.getMetadata();
-
-        // Then defaults should be used
-        assertNotNull(metadata);
-        assertNotNull(metadata.getName());
-        assertNotNull(metadata.getVersion());
+        assertNotNull(loader.getMetadata());
+        assertEquals("Unknown Application", loader.getMetadata().getName());
+        assertEquals("Unknown Version", loader.getMetadata().getVersion());
     }
 
     @Test
     void testSetAppName() {
-        // Given
-        String expectedName = "Test Application";
-
-        // When
-        configLoader.setAppName(expectedName);
-        configLoader.init();
-
-        // Then
-        assertEquals(expectedName, configLoader.getMetadata().getName());
+        ConfigLoader loader = newLoader("Test Application", "Unknown Version", "Unknown Authors", "", "", "");
+        loader.init();
+        assertEquals("Test Application", metadata.getName());
     }
 
     @Test
     void testSetAppVersion() {
-        // Given
-        String expectedVersion = "1.2.3";
-
-        // When
-        configLoader.setAppVersion(expectedVersion);
-        configLoader.init();
-
-        // Then
-        assertEquals(expectedVersion, configLoader.getMetadata().getVersion());
+        ConfigLoader loader = newLoader("Unknown Application", "1.2.3", "Unknown Authors", "", "", "");
+        loader.init();
+        assertEquals("1.2.3", metadata.getVersion());
     }
 
     @Test
     void testSetAppAuthors_SingleAuthor() {
-        // Given
-        String authors = "John Doe";
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "John Doe", "", "", "");
+        loader.init();
 
-        // When
-        configLoader.setAppAuthors(authors);
-        configLoader.init();
-
-        // Then
-        String[] result = configLoader.getMetadata().getAuthors();
-        assertEquals(1, result.length);
-        assertEquals("John Doe", result[0]);
+        assertArrayEquals(new String[]{"John Doe"}, metadata.getAuthors());
     }
 
     @Test
     void testSetAppAuthors_MultipleAuthors() {
-        // Given
-        String authors = "John Doe, Jane Smith, Bob Wilson";
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "John Doe, Jane Smith, Bob Wilson", "", "", "");
+        loader.init();
 
-        // When
-        configLoader.setAppAuthors(authors);
-        configLoader.init();
+        assertArrayEquals(new String[]{"John Doe", "Jane Smith", "Bob Wilson"}, metadata.getAuthors());
+    }
 
-        // Then
-        String[] result = configLoader.getMetadata().getAuthors();
-        assertEquals(3, result.length);
-        assertEquals("John Doe", result[0]);
-        assertEquals("Jane Smith", result[1]);
-        assertEquals("Bob Wilson", result[2]);
+    @Test
+    void testSetAppAuthors_WithSpaces() {
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "John Doe, Jane Smith, Bob Wilson", "", "", "");
+        loader.init();
+
+        assertArrayEquals(new String[]{"John Doe", "Jane Smith", "Bob Wilson"}, metadata.getAuthors());
     }
 
     @Test
     void testSetAppAuthors_EmptyString() {
-        // Given
-        String authors = "";
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "", "", "", "");
+        loader.init();
 
-        // When
-        configLoader.setAppAuthors(authors);
-        configLoader.init();
+        assertArrayEquals(new String[]{"Unknown"}, metadata.getAuthors());
+    }
 
-        // Then
-        String[] result = configLoader.getMetadata().getAuthors();
-        assertEquals(1, result.length);
-        assertEquals("Unknown", result[0]);
+    @Test
+    void testSetAppAuthors_NullValue() {
+        ConfigLoader loader = newLoader("Unknown", "Unknown", null, "", "", "");
+        loader.init();
+
+        assertArrayEquals(new String[]{"Unknown"}, metadata.getAuthors());
     }
 
     @Test
     void testSetAppHomepage() {
-        // Given
-        String homepage = "https://example.com";
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "Unknown", "https://example.com", "", "");
+        loader.init();
 
-        // When
-        configLoader.setAppHomepage(homepage);
-        configLoader.init();
+        assertEquals("https://example.com", metadata.getHomepage());
+    }
 
-        // Then
-        assertEquals(homepage, configLoader.getMetadata().getHomepage());
+    @Test
+    void testSetAppHomepage_NullValue() {
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "Unknown", null, "", "");
+        loader.init();
+
+        assertEquals("", metadata.getHomepage());
     }
 
     @Test
     void testSetAppSupportUrl() {
-        // Given
-        String supportUrl = "https://example.com/support";
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "Unknown", "", "https://example.com/support", "");
+        loader.init();
 
-        // When
-        configLoader.setAppSupportUrl(supportUrl);
-        configLoader.init();
+        assertEquals("https://example.com/support", metadata.getSupportUrl());
+    }
 
-        // Then
-        assertEquals(supportUrl, configLoader.getMetadata().getSupportUrl());
+    @Test
+    void testSetAppSupportUrl_NullValue() {
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "Unknown", "", null, "");
+        loader.init();
+
+        assertEquals("", metadata.getSupportUrl());
     }
 
     @Test
     void testSetAppIssueUrl() {
-        // Given
-        String issueUrl = "https://github.com/example/issues";
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "Unknown", "", "", "https://github.com/example/issues");
+        loader.init();
 
-        // When
-        configLoader.setAppIssueUrl(issueUrl);
-        configLoader.init();
+        assertEquals("https://github.com/example/issues", metadata.getIssueUrl());
+    }
 
-        // Then
-        assertEquals(issueUrl, configLoader.getMetadata().getIssueUrl());
+    @Test
+    void testSetAppIssueUrl_NullValue() {
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "Unknown", "", "", null);
+        loader.init();
+
+        assertEquals("", metadata.getIssueUrl());
     }
 
     @Test
     void testGetMetadata_NotNull() {
-        // When
-        configLoader.init();
-        AppMetadata metadata = configLoader.getMetadata();
+        ConfigLoader loader = newLoader("Unknown", "Unknown", "Unknown", "", "", "");
+        loader.init();
 
-        // Then
-        assertNotNull(metadata);
+        assertNotNull(loader.getMetadata());
     }
 
     @Test
     void testCompleteConfiguration() {
-        // Given
-        configLoader.setAppName("My App");
-        configLoader.setAppVersion("2.0.0");
-        configLoader.setAppAuthors("Alice, Bob");
-        configLoader.setAppHomepage("https://myapp.com");
-        configLoader.setAppSupportUrl("https://myapp.com/help");
-        configLoader.setAppIssueUrl("https://github.com/myapp/issues");
+        ConfigLoader loader = newLoader(
+                "My App",
+                "2.0.0",
+                "Alice, Bob",
+                "https://myapp.com",
+                "https://myapp.com/help",
+                "https://github.com/myapp/issues"
+        );
+        loader.init();
 
-        // When
-        configLoader.init();
-        AppMetadata metadata = configLoader.getMetadata();
-
-        // Then
         assertEquals("My App", metadata.getName());
         assertEquals("2.0.0", metadata.getVersion());
-        assertEquals(2, metadata.getAuthors().length);
+        assertArrayEquals(new String[]{"Alice", "Bob"}, metadata.getAuthors());
         assertEquals("https://myapp.com", metadata.getHomepage());
         assertEquals("https://myapp.com/help", metadata.getSupportUrl());
         assertEquals("https://github.com/myapp/issues", metadata.getIssueUrl());
+    }
+
+    @Test
+    void testInitWithNullMetadata() {
+        ConfigLoader loader = new ConfigLoader(
+                null,
+                "Unknown Application",
+                "Unknown Version",
+                "Unknown Authors",
+                "",
+                "",
+                ""
+        );
+
+        assertDoesNotThrow(loader::init);
+    }
+
+    @Test
+    void testMultipleInitCalls() {
+        ConfigLoader loader = newLoader("First Name", "Unknown", "Unknown", "", "", "");
+        loader.init();
+        assertEquals("First Name", metadata.getName());
+
+        loader = newLoader("Second Name", "Unknown", "Unknown", "", "", "");
+        loader.init();
+        assertEquals("Second Name", metadata.getName());
+    }
+
+    @Test
+    void testEmptyConfigurationValues() {
+        ConfigLoader loader = newLoader("", "", "", "", "", "");
+        loader.init();
+
+        assertEquals("", metadata.getName());
+        assertEquals("", metadata.getVersion());
+        assertEquals("", metadata.getHomepage());
+        assertEquals("", metadata.getSupportUrl());
+        assertEquals("", metadata.getIssueUrl());
     }
 }

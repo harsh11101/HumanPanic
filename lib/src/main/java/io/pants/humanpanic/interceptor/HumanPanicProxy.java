@@ -3,7 +3,7 @@ package io.pants.humanpanic.interceptor;
 import io.pants.humanpanic.HumanPanic;
 import io.pants.humanpanic.reporter.CrashReporter;
 import io.pants.humanpanic.reporter.UserNotifier;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.InvocationHandler;
@@ -13,49 +13,37 @@ import java.lang.reflect.Proxy;
 
 /**
  * Dynamic proxy implementation for @HumanPanic annotation.
- * This provides a fallback mechanism when AspectJ is not available
- * or when you want to manually control which objects have panic handling.
- *
- * <p>Usage example:</p>
- * <pre>{@code
- * // Wrap an interface implementation
- * MyService service = new MyServiceImpl();
- * MyService wrappedService = HumanPanicProxy.wrap(service, MyService.class);
- *
- * // Or use the convenience method for single interface
- * MyService wrappedService = HumanPanicProxy.wrap(service);
- * }</pre>
- *
- * <p><b>Note:</b> This only works with interfaces. For concrete classes,
- * use AspectJ or create a wrapper class manually.</p>
  */
 @Component
+@RequiredArgsConstructor
 public class HumanPanicProxy implements InvocationHandler {
 
-    private final Object target;
-    @Autowired
-    private static CrashReporter crashReporter;
-    @Autowired
-    private static UserNotifier userNotifier;
+    private Object target;
+    private final CrashReporter crashReporter;
+    private final UserNotifier userNotifier;
 
     /**
-     * Private constructor - use static wrap() methods instead
+     * Private constructor for creating instances
      */
-    private HumanPanicProxy(Object target) {
+    private HumanPanicProxy(Object target, CrashReporter crashReporter, UserNotifier userNotifier) {
         this.target = target;
+        this.crashReporter = crashReporter;
+        this.userNotifier = userNotifier;
+    }
+
+    /**
+     * Creates a new proxy instance with dependencies
+     */
+    public <T> T createProxy(T target) {
+        this.target = target;
+        return wrap(target, crashReporter, userNotifier);
     }
 
     /**
      * Wraps an object with HumanPanic proxy.
-     * The object must implement at least one interface.
-     *
-     * @param target the object to wrap
-     * @param <T> the type of the object
-     * @return a proxied instance that intercepts @HumanPanic annotated methods
-     * @throws IllegalArgumentException if target doesn't implement any interfaces
      */
     @SuppressWarnings("unchecked")
-    public static <T> T wrap(T target) {
+    public static <T> T wrap(T target, CrashReporter crashReporter, UserNotifier userNotifier) {
         if (target == null) {
             throw new IllegalArgumentException("Target object cannot be null");
         }
@@ -71,21 +59,16 @@ public class HumanPanicProxy implements InvocationHandler {
         return (T) Proxy.newProxyInstance(
                 target.getClass().getClassLoader(),
                 interfaces,
-                new HumanPanicProxy(target)
+                new HumanPanicProxy(target, crashReporter, userNotifier)
         );
     }
 
     /**
      * Wraps an object with HumanPanic proxy for a specific interface.
-     *
-     * @param target the object to wrap
-     * @param interfaceClass the interface to proxy
-     * @param <T> the interface type
-     * @return a proxied instance that intercepts @HumanPanic annotated methods
-     * @throws IllegalArgumentException if target doesn't implement the interface
      */
     @SuppressWarnings("unchecked")
-    public static <T> T wrap(Object target, Class<T> interfaceClass) {
+    public static <T> T wrap(Object target, Class<T> interfaceClass,
+                             CrashReporter crashReporter, UserNotifier userNotifier) {
         if (target == null) {
             throw new IllegalArgumentException("Target object cannot be null");
         }
@@ -101,50 +84,12 @@ public class HumanPanicProxy implements InvocationHandler {
         return (T) Proxy.newProxyInstance(
                 target.getClass().getClassLoader(),
                 new Class<?>[]{interfaceClass},
-                new HumanPanicProxy(target)
-        );
-    }
-
-    /**
-     * Wraps an object with HumanPanic proxy for multiple interfaces.
-     *
-     * @param target the object to wrap
-     * @param interfaces the interfaces to proxy
-     * @param <T> the type of the object
-     * @return a proxied instance that intercepts @HumanPanic annotated methods
-     */
-    @SuppressWarnings("unchecked")
-    public static <T> T wrap(T target, Class<?>... interfaces) {
-        if (target == null) {
-            throw new IllegalArgumentException("Target object cannot be null");
-        }
-        if (interfaces == null || interfaces.length == 0) {
-            throw new IllegalArgumentException("Must provide at least one interface");
-        }
-
-        for (Class<?> iface : interfaces) {
-            if (!iface.isInterface()) {
-                throw new IllegalArgumentException(iface.getName() + " is not an interface");
-            }
-            if (!iface.isAssignableFrom(target.getClass())) {
-                throw new IllegalArgumentException(
-                        "Target must implement " + iface.getName()
-                );
-            }
-        }
-
-        return (T) Proxy.newProxyInstance(
-                target.getClass().getClassLoader(),
-                interfaces,
-                new HumanPanicProxy(target)
+                new HumanPanicProxy(target, crashReporter, userNotifier)
         );
     }
 
     /**
      * Checks if an object is already wrapped by HumanPanicProxy
-     *
-     * @param obj the object to check
-     * @return true if the object is a HumanPanic proxy
      */
     public static boolean isWrapped(Object obj) {
         return Proxy.isProxyClass(obj.getClass())
@@ -153,11 +98,6 @@ public class HumanPanicProxy implements InvocationHandler {
 
     /**
      * Unwraps a proxied object to get the original target
-     *
-     * @param proxy the proxy object
-     * @param <T> the type of the target
-     * @return the original target object
-     * @throws IllegalArgumentException if object is not a HumanPanic proxy
      */
     @SuppressWarnings("unchecked")
     public static <T> T unwrap(Object proxy) {
@@ -171,10 +111,8 @@ public class HumanPanicProxy implements InvocationHandler {
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        // Check if method has @HumanPanic annotation
         HumanPanic annotation = method.getAnnotation(HumanPanic.class);
 
-        // If no annotation, just invoke normally
         if (annotation == null) {
             try {
                 return method.invoke(target, args);
@@ -183,22 +121,18 @@ public class HumanPanicProxy implements InvocationHandler {
             }
         }
 
-        // Method has @HumanPanic, apply panic handling
         try {
             return method.invoke(target, args);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             handleException(cause, annotation, method);
 
-            // Exit if configured
             if (annotation.exitCode() != 0) {
                 System.exit(annotation.exitCode());
             }
 
-            // Return default value based on return type
             return getDefaultReturnValue(method.getReturnType());
         } catch (Exception e) {
-            // Handle reflection exceptions
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             handleException(cause, annotation, method);
 
@@ -210,11 +144,7 @@ public class HumanPanicProxy implements InvocationHandler {
         }
     }
 
-    /**
-     * Handles the exception according to annotation settings
-     */
     private void handleException(Throwable throwable, HumanPanic annotation, Method method) {
-        // Create crash report if enabled
         if (annotation.createCrashReport()) {
             String reportPath = crashReporter.createReport(throwable, method);
             if (!annotation.silent()) {
@@ -230,15 +160,11 @@ public class HumanPanicProxy implements InvocationHandler {
             );
         }
 
-        // Print stack trace if debugging
         if (annotation.printStackTrace()) {
             throwable.printStackTrace();
         }
     }
 
-    /**
-     * Returns default value for primitive types, null for objects
-     */
     private Object getDefaultReturnValue(Class<?> returnType) {
         if (returnType == void.class || returnType == Void.class) {
             return null;

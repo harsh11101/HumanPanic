@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.pants.humanpanic.config.AppMetadata;
 import io.pants.humanpanic.config.ConfigLoader;
 import io.pants.humanpanic.model.CrashReport;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -23,15 +23,17 @@ import java.util.*;
  * Creates JSON crash reports similar to Rust's human-panic
  */
 @Component
+@RequiredArgsConstructor
 public class CrashReporter {
-    @Autowired
-    private static ConfigLoader configLoader;
+
+    private final ConfigLoader configLoader;
     private static final String REPORT_DIR = "crash-reports";
     private static final DateTimeFormatter FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss");
     private final ObjectMapper objectMapper;
 
-    private CrashReporter() {
+    public CrashReporter(ConfigLoader configLoader) {
+        this.configLoader = configLoader;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
     }
@@ -73,13 +75,16 @@ public class CrashReporter {
                         "We have generated a report file at the location below. Please include " +
                         "this file in your bug report."
         );
-        report.setCause(throwable.getClass().getName() + ": " + throwable.getMessage());
+        report.setCause(throwable.getClass().getName() + ": " +
+                (throwable.getMessage() != null ? throwable.getMessage() : "No message"));
 
         // Method info
-        CrashReport.MethodInfo methodInfo = new CrashReport.MethodInfo();
-        methodInfo.setClassName(method.getDeclaringClass().getName());
-        methodInfo.setMethodName(method.getName());
-        report.setMethod(methodInfo);
+        if (method != null) {
+            CrashReport.MethodInfo methodInfo = new CrashReport.MethodInfo();
+            methodInfo.setClassName(method.getDeclaringClass().getName());
+            methodInfo.setMethodName(method.getName());
+            report.setMethod(methodInfo);
+        }
 
         // Stack trace
         List<CrashReport.StackFrame> frames = new ArrayList<>();
