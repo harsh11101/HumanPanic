@@ -3,6 +3,7 @@ package io.pants.humanpanic.unitTest.reporter;
 import io.pants.humanpanic.config.AppMetadata;
 import io.pants.humanpanic.config.ConfigLoader;
 import io.pants.humanpanic.reporter.CrashReporter;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,6 +47,18 @@ class CrashReporterTest {
         when(metadata.getIssueUrl()).thenReturn("https://test.com/issues");
 
         crashReporter = new CrashReporter(configLoader);
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Clean up generated reports
+        File reportDir = new File("crash-reports");
+        if (reportDir.exists() && reportDir.isDirectory()) {
+            for (File file : reportDir.listFiles()) {
+                file.delete();
+            }
+            reportDir.delete();
+        }
     }
 
     @Test

@@ -2,7 +2,7 @@ package io.pants.humanpanic.config;
 
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
-import lombok.Setter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -12,36 +12,31 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Getter
-@Setter
 @Component
+@RequiredArgsConstructor
 public class ConfigLoader {
 
     private final AppMetadata metadata;
-    private final String appName;
-    private final String appVersion;
-    private final String appAuthors;
-    private final String appHomepage;
-    private final String appSupportUrl;
-    private final String appIssueUrl;
 
-    public ConfigLoader(
-            AppMetadata metadata,
-            @Value("${app.name:Unknown Application}") String appName,
-            @Value("${app.version:Unknown Version}") String appVersion,
-            @Value("${app.authors:Unknown Authors}") String appAuthors,
-            @Value("${app.homepage:}") String appHomepage,
-            @Value("${app.support-url:}") String appSupportUrl,
-            @Value("${app.issue-url:}") String appIssueUrl
-    ) {
-        this.metadata = metadata;
-        this.appName = appName;
-        this.appVersion = appVersion;
-        this.appAuthors = appAuthors;
-        this.appHomepage = appHomepage;
-        this.appSupportUrl = appSupportUrl;
-        this.appIssueUrl = appIssueUrl;
-    }
+    @Value("${app.name:Unknown Application}")
+    private String appName;
 
+    @Value("${app.version:Unknown Version}")
+    private String appVersion;
+
+    @Value("${app.authors:Unknown Authors}")
+    private String appAuthors;
+
+    @Value("${app.homepage:}")
+    private String appHomepage;
+
+    @Value("${app.support-url:}")
+    private String appSupportUrl;
+
+    @Value("${app.issue-url:}")
+    private String appIssueUrl;
+
+    @PostConstruct
     public void init() {
         if (metadata == null) {
             log.warn("AppMetadata is null, attempting fallback configuration");
@@ -86,7 +81,7 @@ public class ConfigLoader {
                 if (implVersion != null) metadata.setVersion(implVersion);
             }
         } catch (Exception e) {
-            log.error("Failed to load config from manifest", e);
+            log.error("Failed to load config from manifest, error = {}", e.getMessage());
         }
     }
 }

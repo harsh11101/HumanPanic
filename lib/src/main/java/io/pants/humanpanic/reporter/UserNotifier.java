@@ -3,13 +3,13 @@ package io.pants.humanpanic.reporter;
 import io.pants.humanpanic.config.AppMetadata;
 import io.pants.humanpanic.config.ConfigLoader;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Displays human-friendly panic messages like Rust's human-panic
  */
-@Component
 @RequiredArgsConstructor
+@Slf4j
 public class UserNotifier {
 
     private final ConfigLoader configLoader;
@@ -67,27 +67,29 @@ public class UserNotifier {
         sb.append("\n");
         sb.append("Thank you kindly!\n");
 
-        System.err.println(sb.toString());
+        log.info("{}", sb);
     }
 
     public void notify(String message, Throwable throwable) {
         AppMetadata metadata = configLoader.getMetadata();
 
-        System.err.println("\n");
-        System.err.println("Well, this is embarrassing.");
-        System.err.println("\n");
-        System.err.println(metadata.getName() + " encountered an error:");
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n");
+        sb.append("Well, this is embarrassing.\n");
+        sb.append("\n");
+        sb.append(metadata.getName()).append(" encountered an error:\n");
 
         if (message != null && !message.isEmpty() && !message.equals("An error occurred")) {
-            System.err.println("  " + message);
+            sb.append("  ").append(message).append("\n");
         }
 
-        System.err.println("  " + throwable.getClass().getSimpleName());
+        sb.append("  ").append(throwable.getClass().getSimpleName()).append("\n");
         if (throwable.getMessage() != null) {
-            System.err.println("  " + throwable.getMessage());
+            sb.append("  ").append(throwable.getMessage()).append("\n");
         }
-        System.err.println("\n");
-        System.err.println("The application will continue running.");
-        System.err.println();
+        sb.append("\n");
+        sb.append("The application will continue running.\n");
+
+        log.info("{}", sb);
     }
 }

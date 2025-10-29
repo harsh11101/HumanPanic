@@ -4,6 +4,7 @@ import io.pants.humanpanic.HumanPanic;
 import io.pants.humanpanic.reporter.CrashReporter;
 import io.pants.humanpanic.reporter.UserNotifier;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -19,6 +20,7 @@ import java.lang.reflect.Method;
 @Aspect
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class HumanPanicAspect {
 
     private final CrashReporter crashReporter;

@@ -37,8 +37,8 @@ class CrashReportTest {
 
     @Test
     void testSetAndGetCrateVersion() {
-        crashReport.setCrateVersion("1.0.0");
-        assertEquals("1.0.0", crashReport.getCrateVersion());
+        crashReport.setVersion("1.0.0");
+        assertEquals("1.0.0", crashReport.getVersion());
     }
 
     @Test
@@ -182,7 +182,7 @@ class CrashReportTest {
         // Create complete crash report
         crashReport.setName("Test App");
         crashReport.setOperatingSystem("Linux 5.15.0");
-        crashReport.setCrateVersion("1.0.0");
+        crashReport.setVersion("1.0.0");
         crashReport.setExplanation("Test explanation");
         crashReport.setCause("RuntimeException: Test error");
 
@@ -228,7 +228,7 @@ class CrashReportTest {
         // Verify all fields
         assertEquals("Test App", crashReport.getName());
         assertEquals("Linux 5.15.0", crashReport.getOperatingSystem());
-        assertEquals("1.0.0", crashReport.getCrateVersion());
+        assertEquals("1.0.0", crashReport.getVersion());
         assertNotNull(crashReport.getExplanation());
         assertNotNull(crashReport.getCause());
         assertNotNull(crashReport.getMethod());
@@ -241,7 +241,7 @@ class CrashReportTest {
     void testNullValues() {
         crashReport.setName(null);
         crashReport.setOperatingSystem(null);
-        crashReport.setCrateVersion(null);
+        crashReport.setVersion(null);
         crashReport.setExplanation(null);
         crashReport.setCause(null);
         crashReport.setMethod(null);
@@ -251,7 +251,7 @@ class CrashReportTest {
 
         assertNull(crashReport.getName());
         assertNull(crashReport.getOperatingSystem());
-        assertNull(crashReport.getCrateVersion());
+        assertNull(crashReport.getVersion());
         assertNull(crashReport.getExplanation());
         assertNull(crashReport.getCause());
         assertNull(crashReport.getMethod());

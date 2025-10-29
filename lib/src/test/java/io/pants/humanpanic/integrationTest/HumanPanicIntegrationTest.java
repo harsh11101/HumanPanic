@@ -7,6 +7,7 @@ import io.pants.humanpanic.config.HumanPanicConfiguration;
 import io.pants.humanpanic.interceptor.HumanPanicAspect;
 import io.pants.humanpanic.reporter.CrashReporter;
 import io.pants.humanpanic.reporter.UserNotifier;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,18 @@ class HumanPanicIntegrationTest {
 
     @Autowired
     private HumanPanicAspect humanPanicAspect;
+
+    @AfterEach
+    void tearDown() {
+        // Clean up generated reports
+        File reportDir = new File("crash-reports");
+        if (reportDir.exists() && reportDir.isDirectory()) {
+            for (File file : reportDir.listFiles()) {
+                file.delete();
+            }
+            reportDir.delete();
+        }
+    }
 
     @Test
     void testSpringContextLoads() {

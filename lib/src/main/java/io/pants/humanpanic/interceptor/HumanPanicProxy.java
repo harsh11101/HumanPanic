@@ -14,7 +14,6 @@ import java.lang.reflect.Proxy;
 /**
  * Dynamic proxy implementation for @HumanPanic annotation.
  */
-@Component
 @RequiredArgsConstructor
 public class HumanPanicProxy implements InvocationHandler {
 

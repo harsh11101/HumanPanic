@@ -16,8 +16,8 @@ public class CrashReport {
     @JsonProperty("operating_system")
     private String operatingSystem;
 
-    @JsonProperty("crate_version")
-    private String crateVersion;
+    @JsonProperty("version")
+    private String version;
 
     @JsonProperty("explanation")
     private String explanation;

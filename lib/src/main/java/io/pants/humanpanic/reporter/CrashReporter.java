@@ -6,7 +6,7 @@ import io.pants.humanpanic.config.AppMetadata;
 import io.pants.humanpanic.config.ConfigLoader;
 import io.pants.humanpanic.model.CrashReport;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
@@ -22,7 +22,7 @@ import java.util.*;
 /**
  * Creates JSON crash reports similar to Rust's human-panic
  */
-@Component
+@Slf4j
 @RequiredArgsConstructor
 public class CrashReporter {
 
@@ -54,7 +54,7 @@ public class CrashReporter {
 
             return reportPath.toAbsolutePath().toString();
         } catch (IOException e) {
-            System.err.println("Failed to create crash report: " + e.getMessage());
+            log.error("Failed to create crash report, error =  {}", e.getMessage());
             return null;
         }
     }
@@ -67,7 +67,7 @@ public class CrashReporter {
         report.setName(metadata.getName());
         report.setOperatingSystem(System.getProperty("os.name") + " " +
                 System.getProperty("os.version"));
-        report.setCrateVersion(metadata.getVersion());
+        report.setVersion(metadata.getVersion());
         report.setExplanation(
                 "Well, this is embarrassing.\n\n" +
                         metadata.getName() + " had a problem and crashed. To help us diagnose " +
