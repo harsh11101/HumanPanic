@@ -1,0 +1,11 @@
+# JitPack configuration file
+jdk:
+  - openjdk21
+
+# Install command (default works for most cases)
+install:
+  - ./gradlew :lib:publishToMavenLocal
+
+# Build command
+before_install:
+  - echo "Preparing build environment"

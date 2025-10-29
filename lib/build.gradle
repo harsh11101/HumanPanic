@@ -7,12 +7,13 @@
 
 plugins {
     id 'java-library'
+    id 'maven-publish'
     id 'io.freefair.aspectj.post-compile-weaving' version '9.0.0'
     id 'io.freefair.lombok' version '9.0.0'
 }
 
-group = 'com.github.harsh11101'  // JitPack requires this format
-version = '1.0.0'                // Update this to match your GitHub release tag
+group = 'com.github.harsh11101'  // JitPack uses your GitHub username
+version = '1.0.0'                 // This will be overridden by git tags
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -23,7 +24,6 @@ java {
 
 repositories {
     mavenCentral()
-    maven { url "https://jitpack.io"  }
 }
 
 dependencies {
@@ -42,9 +42,6 @@ dependencies {
     // SLF4J + Lombok
     implementation "org.projectlombok:lombok:1.18.42"
     compileOnly "org.slf4j:slf4j-api:2.0.9"
-
-    // Jitpack
-    implementation "com.github.harsh11101:HumanPanic:main-SNAPSHOT"
 
     // Jakarta
     implementation "jakarta.annotation:jakarta.annotation-api:3.0.0"
@@ -69,5 +66,45 @@ tasks.named('jar') {
                 'Implementation-Version': project.version,
                 'Automatic-Module-Name': 'io.pants.humanpanic'
         )
+    }
+}
+
+// Maven publishing configuration for JitPack
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = 'com.github.harsh11101'
+            artifactId = 'HumanPanic'
+            version = project.version
+
+            from components.java
+
+            pom {
+                name = 'HumanPanic'
+                description = 'Human-friendly panic handler for Java applications inspired by Rust\'s human-panic'
+                url = 'https://github.com/harsh11101/HumanPanic'
+
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/licenses/MIT'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'harsh11101'
+                        name = 'Harsh Pant'
+                        email = 'hiteshpant11101@gmail.com'
+                    }
+                }
+
+                scm {
+                    connection = 'scm:git:git://github.com/harsh11101/HumanPanic.git'
+                    developerConnection = 'scm:git:ssh://github.com:harsh11101/HumanPanic.git'
+                    url = 'https://github.com/harsh11101/HumanPanic/tree/main'
+                }
+            }
+        }
     }
 }
