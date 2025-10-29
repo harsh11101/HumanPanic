@@ -1,5 +1,8 @@
 package io.pants.humanpanic.unitTest.reporter;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.pants.humanpanic.config.AppMetadata;
 import io.pants.humanpanic.config.ConfigLoader;
 import io.pants.humanpanic.reporter.UserNotifier;
@@ -8,15 +11,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for UserNotifier
+ * Unit tests for UserNotifier using Logback logger capture.
  */
 class UserNotifierTest {
 
@@ -27,14 +30,14 @@ class UserNotifierTest {
     private AppMetadata metadata;
 
     private UserNotifier userNotifier;
-    private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
-    private final PrintStream originalErr = System.err;
+    private ListAppender<ILoggingEvent> logAppender;
+    private Logger logger;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        System.setErr(new PrintStream(errContent));
 
+        // Setup mock configuration
         when(configLoader.getMetadata()).thenReturn(metadata);
         when(metadata.getName()).thenReturn("Test App");
         when(metadata.getVersion()).thenReturn("1.0.0");
@@ -43,77 +46,86 @@ class UserNotifierTest {
         when(metadata.getSupportUrl()).thenReturn("https://test.com/support");
         when(metadata.getIssueUrl()).thenReturn("https://test.com/issues");
 
+        // Initialize logger capture
+        logger = (Logger) LoggerFactory.getLogger(UserNotifier.class);
+        logger.detachAndStopAllAppenders();
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        logger.addAppender(logAppender);
+
         userNotifier = new UserNotifier(configLoader);
     }
 
     @AfterEach
-    void restoreStreams() {
-        System.setErr(originalErr);
+    void tearDown() {
+        logger.detachAppender(logAppender);
+        logAppender.stop();
     }
+
+    private String getAllLogs() {
+        return logAppender.list.stream()
+                .map(ILoggingEvent::getFormattedMessage)
+                .collect(Collectors.joining("\n"));
+    }
+
+    // ------------------ TESTS ------------------
 
     @Test
     void testNotifyWithReport_BasicMessage() {
-        String message = "Test error message";
-        String reportPath = "/path/to/crash-report.json";
+        userNotifier.notifyWithReport("Test error message", "/path/to/crash-report.json");
 
-        userNotifier.notifyWithReport(message, reportPath);
-
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains("Test App"));
-        assertTrue(output.contains(message));
-        assertTrue(output.contains(reportPath));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("Test App"));
+        assertTrue(logs.contains("Test error message"));
+        assertTrue(logs.contains("/path/to/crash-report.json"));
     }
 
     @Test
     void testNotifyWithReport_WithoutCustomMessage() {
-        String reportPath = "/path/to/crash-report.json";
+        userNotifier.notifyWithReport("An error occurred", "/path/to/crash-report.json");
 
-        userNotifier.notifyWithReport("An error occurred", reportPath);
-
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains(reportPath));
-        assertFalse(output.contains("An error occurred\n"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("/path/to/crash-report.json"));
+        assertFalse(logs.contains("An error occurred\n"));
     }
 
     @Test
     void testNotifyWithReport_WithNullReportPath() {
-        String message = "Test error message";
+        userNotifier.notifyWithReport("Test error message", null);
 
-        userNotifier.notifyWithReport(message, null);
-
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains(message));
-        assertFalse(output.contains("We have generated a report file at"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("Test error message"));
+        assertFalse(logs.contains("We have generated a report file at"));
     }
 
     @Test
     void testNotifyWithReport_ContainsIssueUrl() {
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Open an issue at"));
-        assertTrue(output.contains("https://test.com/issues"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Open an issue at"));
+        assertTrue(logs.contains("https://test.com/issues"));
     }
 
     @Test
     void testNotifyWithReport_ContainsSupportUrl() {
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Get help at"));
-        assertTrue(output.contains("https://test.com/support"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Get help at"));
+        assertTrue(logs.contains("https://test.com/support"));
     }
 
     @Test
     void testNotifyWithReport_ContainsAuthors() {
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Contact the authors"));
-        assertTrue(output.contains("Test Author"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Contact the authors"));
+        assertTrue(logs.contains("Test Author"));
     }
 
     @Test
@@ -122,8 +134,8 @@ class UserNotifierTest {
 
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertFalse(output.contains("Open an issue at"));
+        String logs = getAllLogs();
+        assertFalse(logs.contains("Open an issue at"));
     }
 
     @Test
@@ -132,8 +144,8 @@ class UserNotifierTest {
 
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertFalse(output.contains("Get help at"));
+        String logs = getAllLogs();
+        assertFalse(logs.contains("Get help at"));
     }
 
     @Test
@@ -142,8 +154,8 @@ class UserNotifierTest {
 
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertFalse(output.contains("Contact the authors"));
+        String logs = getAllLogs();
+        assertFalse(logs.contains("Contact the authors"));
     }
 
     @Test
@@ -152,25 +164,24 @@ class UserNotifierTest {
 
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Author1"));
-        assertTrue(output.contains("Author2"));
-        assertTrue(output.contains("Author3"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Author1"));
+        assertTrue(logs.contains("Author2"));
+        assertTrue(logs.contains("Author3"));
     }
 
     @Test
     void testNotify_BasicMessage() {
-        String message = "Custom error message";
         Throwable throwable = new RuntimeException("Test exception");
 
-        userNotifier.notify(message, throwable);
+        userNotifier.notify("Custom error message", throwable);
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains("Test App"));
-        assertTrue(output.contains(message));
-        assertTrue(output.contains("RuntimeException"));
-        assertTrue(output.contains("Test exception"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("Test App"));
+        assertTrue(logs.contains("Custom error message"));
+        assertTrue(logs.contains("RuntimeException"));
+        assertTrue(logs.contains("Test exception"));
     }
 
     @Test
@@ -179,10 +190,10 @@ class UserNotifierTest {
 
         userNotifier.notify("An error occurred", throwable);
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains("RuntimeException"));
-        assertFalse(output.contains("An error occurred\n  "));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("RuntimeException"));
+        assertFalse(logs.contains("An error occurred\n  "));
     }
 
     @Test
@@ -191,9 +202,9 @@ class UserNotifierTest {
 
         userNotifier.notify(null, throwable);
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains("RuntimeException"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("RuntimeException"));
     }
 
     @Test
@@ -202,9 +213,9 @@ class UserNotifierTest {
 
         userNotifier.notify("", throwable);
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains("RuntimeException"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("RuntimeException"));
     }
 
     @Test
@@ -213,10 +224,10 @@ class UserNotifierTest {
 
         userNotifier.notify("Test message", throwable);
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains("Test message"));
-        assertTrue(output.contains("RuntimeException"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("Test message"));
+        assertTrue(logs.contains("RuntimeException"));
     }
 
     @Test
@@ -229,47 +240,45 @@ class UserNotifierTest {
         };
 
         for (Exception exception : exceptions) {
-            errContent.reset();
+            logAppender.list.clear();
             userNotifier.notify("Test", exception);
 
-            String output = errContent.toString();
-            assertTrue(output.contains(exception.getClass().getSimpleName()));
+            String logs = getAllLogs();
+            assertTrue(logs.contains(exception.getClass().getSimpleName()));
         }
     }
 
     @Test
     void testNotify_ContainsContinueMessage() {
-        Throwable throwable = new RuntimeException("Test");
+        userNotifier.notify("Test", new RuntimeException("Test"));
 
-        userNotifier.notify("Test", throwable);
-
-        String output = errContent.toString();
-        assertTrue(output.contains("The application will continue running"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("The application will continue running"));
     }
 
     @Test
     void testNotifyWithReport_ContainsPrivacyMessage() {
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertTrue(output.contains("We take privacy seriously"));
-        assertTrue(output.contains("do not perform any automated error collection"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("We take privacy seriously"));
+        assertTrue(logs.contains("do not perform any automated error collection"));
     }
 
     @Test
     void testNotifyWithReport_ContainsThankYouMessage() {
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Thank you kindly!"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Thank you kindly!"));
     }
 
     @Test
     void testNotifyWithReport_ContainsCrashReportSubject() {
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Test App Crash Report"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Test App Crash Report"));
     }
 
     @Test
@@ -278,37 +287,31 @@ class UserNotifierTest {
 
         userNotifier.notify("Test", new RuntimeException("Test"));
 
-        String output = errContent.toString();
-        assertTrue(output.contains("encountered an error"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("encountered an error"));
     }
 
     @Test
     void testNotifyWithReport_WithNullMessage() {
         userNotifier.notifyWithReport(null, "/path/to/report.json");
 
-        String output = errContent.toString();
-        assertTrue(output.contains("Well, this is embarrassing"));
-        // Should not throw exception
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
     }
 
     @Test
     void testNotifyWithReport_CompleteScenario() {
-        String message = "Database connection failed";
-        String reportPath = "/var/logs/crash-2024-01-01-12-00-00.json";
+        userNotifier.notifyWithReport("Database connection failed", "/var/logs/crash-2024-01-01-12-00-00.json");
 
-        userNotifier.notifyWithReport(message, reportPath);
-
-        String output = errContent.toString();
-
-        // Verify all key components are present
-        assertTrue(output.contains("Well, this is embarrassing"));
-        assertTrue(output.contains("Test App"));
-        assertTrue(output.contains(message));
-        assertTrue(output.contains(reportPath));
-        assertTrue(output.contains("Test App Crash Report"));
-        assertTrue(output.contains("https://test.com/issues"));
-        assertTrue(output.contains("https://test.com/support"));
-        assertTrue(output.contains("Test Author"));
-        assertTrue(output.contains("Thank you kindly!"));
+        String logs = getAllLogs();
+        assertTrue(logs.contains("Well, this is embarrassing"));
+        assertTrue(logs.contains("Test App"));
+        assertTrue(logs.contains("Database connection failed"));
+        assertTrue(logs.contains("/var/logs/crash-2024-01-01-12-00-00.json"));
+        assertTrue(logs.contains("Test App Crash Report"));
+        assertTrue(logs.contains("https://test.com/issues"));
+        assertTrue(logs.contains("https://test.com/support"));
+        assertTrue(logs.contains("Test Author"));
+        assertTrue(logs.contains("Thank you kindly!"));
     }
 }

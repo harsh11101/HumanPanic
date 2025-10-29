@@ -7,13 +7,12 @@
 
 plugins {
     id 'java-library'
-    id 'maven-publish'
     id 'io.freefair.aspectj.post-compile-weaving' version '9.0.0'
     id 'io.freefair.lombok' version '9.0.0'
 }
 
-group = project.property('group')
-version = project.property('version')
+group = 'com.github.harsh11101'  // JitPack requires this format
+version = '1.0.0'                // Update this to match your GitHub release tag
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -24,6 +23,7 @@ java {
 
 repositories {
     mavenCentral()
+    maven { url "https://jitpack.io"  }
 }
 
 dependencies {
@@ -33,19 +33,22 @@ dependencies {
     // AspectJ
     implementation "org.aspectj:aspectjrt:1.9.24"
     implementation "org.aspectj:aspectjweaver:1.9.24"
-    
+
     // Jackson for JSON
     implementation "com.fasterxml.jackson.core:jackson-databind:2.17.1"
     implementation "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.1"
     implementation "com.fasterxml.jackson.core:jackson-annotations:2.17.1"
 
-    // SLF4J for logging, Lombok
+    // SLF4J + Lombok
     implementation "org.projectlombok:lombok:1.18.42"
     compileOnly "org.slf4j:slf4j-api:2.0.9"
 
+    // Jitpack
+    implementation "com.github.harsh11101:HumanPanic:main-SNAPSHOT"
+
     // Jakarta
     implementation "jakarta.annotation:jakarta.annotation-api:3.0.0"
-    
+
     // Testing
     testImplementation "org.junit.jupiter:junit-jupiter:5.14.0"
     testImplementation "org.mockito:mockito-junit-jupiter:5.20.0"
@@ -53,7 +56,6 @@ dependencies {
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
     testImplementation "org.mockito:mockito-core:5.20.0"
     testAnnotationProcessor "org.projectlombok:lombok:1.18.42"
-
 }
 
 tasks.named('test') {
@@ -63,52 +65,9 @@ tasks.named('test') {
 tasks.named('jar') {
     manifest {
         attributes(
-            'Implementation-Title': project.name,
-            'Implementation-Version': project.version,
-            'Automatic-Module-Name': 'io.pants.humanpanic'
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version,
+                'Automatic-Module-Name': 'io.pants.humanpanic'
         )
-    }
-}
-
-// Publishing configuration
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-            
-            pom {
-                name = 'HumanPanic'
-                description = 'Human-friendly panic handler for Java applications'
-                url = 'https://github.com/harsh11101/HumanPanic'
-                
-                licenses {
-                    license {
-                        name = 'MIT License'
-                        url = 'https://opensource.org/licenses/MIT'
-                    }
-                }
-                
-                developers {
-                    developer {
-                        id = 'harsh11101'
-                        name = 'Harsh Pant'
-                        email = 'hiteshpant11101@gmail.com'
-                    }
-                }
-                
-                scm {
-                    connection = 'scm:git:git://github.com/harsh11101/HumanPanic.git'
-                    developerConnection = 'scm:git:ssh://github.com/harsh11101/HumanPanic.git'
-                    url = 'https://github.com/harsh11101/HumanPanic'
-                }
-            }
-        }
-    }
-    
-    repositories {
-        maven {
-            name = 'local'
-            url = layout.buildDirectory.dir('repo')
-        }
     }
 }
