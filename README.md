@@ -133,3 +133,5 @@ Thank you for using HumanPanic!
 If you encounter bugs, please first Panic Humanely, then open an issue or submit a pull request.
 
 ---
+
+**Made with ❤️ by harsh11101**
