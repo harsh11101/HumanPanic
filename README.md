@@ -1,5 +1,5 @@
 # HumanPanic
-![JitPack]([![](https://jitpack.io/v/harsh11101/HumanPanic.svg)](https://jitpack.io/#harsh11101/HumanPanic))
+[![](https://jitpack.io/v/harsh11101/HumanPanic.svg)](https://jitpack.io/#harsh11101/HumanPanic)
 
 **Human-friendly panic handler for Java CLI applications**
 
