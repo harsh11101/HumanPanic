@@ -4,7 +4,7 @@ Thank you for considering contributing to the HumanPanic project! 🎉
 Your help makes the project better for everyone.
 
 ## Code of Conduct
-Please follow the [Contributor Covenant](https://www.contributor-covenant.org/) or whatever code of conduct you adopt.
+Please follow the [Contributor Covenant](https://www.contributor-covenant.org/).
 
 ## How to contribute
 You can contribute by:
@@ -25,20 +25,32 @@ You can contribute by:
     ```
 
 2. **Ensure you have prerequisites installed**
-   * Java 8+ (or configured target version)
-   * Gradle (if you prefer your local install) or use the bundled wrapper (`./gradlew`, `gradlew.bat`)
+   * JDK 17 or newer (the library is compiled with `--release 17`)
+   * The bundled Gradle wrapper (`./gradlew`, `gradlew.bat`)
 
 3. **Build the project**
    ```bash
    ./gradlew clean build
    ```
-   This will compile the code, run tests, and produce build artifacts.
+   This compiles the code (with `-Xlint:all`), runs all tests, and builds the jar, sources jar
+   and Javadoc (with zero doclint warnings).
 
-4. **Code style / formatting**
+   To try your change the way a consumer would, run the demo:
+   ```bash
+   ./gradlew :lib:publishToMavenLocal
+   ./gradlew -p demo installDist
+   ```
+
+4. **Code style / design rules**
    * Follow the existing code style (indentation, braces, naming)
+   * The core must keep **zero runtime dependencies**. Spring/AspectJ are `compileOnly` and may only
+     be referenced from the Spring integration classes (`HumanPanicConfiguration`, `ConfigLoader`,
+     `HumanPanicAspect`)
+   * Handling a failure must never throw: catch and log via `io.pants.humanpanic.internal.Diagnostics`
+   * `io.pants.humanpanic.internal` is not public API; everything else is, so document it with Javadoc
 
 5. **Testing**
-   * Add unit tests for new features/bug fixes
+   * Add unit tests for new features, and a regression test for every bug fix
    * Ensure all tests pass before submitting a pull request
 
 6. **Commit / Branching Workflow**

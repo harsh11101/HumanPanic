@@ -1,8 +1,5 @@
 package io.pants.humanpanic.unitTest.reporter;
 
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import io.pants.humanpanic.config.AppMetadata;
 import io.pants.humanpanic.config.ConfigLoader;
 import io.pants.humanpanic.reporter.UserNotifier;
@@ -11,15 +8,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.slf4j.LoggerFactory;
 
-import java.util.stream.Collectors;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for UserNotifier using Logback logger capture.
+ * Unit tests for UserNotifier. Output is captured from System.err, the default destination.
  */
 class UserNotifierTest {
 
@@ -30,8 +28,8 @@ class UserNotifierTest {
     private AppMetadata metadata;
 
     private UserNotifier userNotifier;
-    private ListAppender<ILoggingEvent> logAppender;
-    private Logger logger;
+    private final ByteArrayOutputStream captured = new ByteArrayOutputStream();
+    private PrintStream originalErr;
 
     @BeforeEach
     void setUp() {
@@ -46,26 +44,20 @@ class UserNotifierTest {
         when(metadata.getSupportUrl()).thenReturn("https://test.com/support");
         when(metadata.getIssueUrl()).thenReturn("https://test.com/issues");
 
-        // Initialize logger capture
-        logger = (Logger) LoggerFactory.getLogger(UserNotifier.class);
-        logger.detachAndStopAllAppenders();
-        logAppender = new ListAppender<>();
-        logAppender.start();
-        logger.addAppender(logAppender);
+        // Capture System.err (looked up lazily by the notifier)
+        originalErr = System.err;
+        System.setErr(new PrintStream(captured, true, StandardCharsets.UTF_8));
 
         userNotifier = new UserNotifier(configLoader);
     }
 
     @AfterEach
     void tearDown() {
-        logger.detachAppender(logAppender);
-        logAppender.stop();
+        System.setErr(originalErr);
     }
 
     private String getAllLogs() {
-        return logAppender.list.stream()
-                .map(ILoggingEvent::getFormattedMessage)
-                .collect(Collectors.joining("\n"));
+        return captured.toString(StandardCharsets.UTF_8);
     }
 
     // ------------------ TESTS ------------------
@@ -83,12 +75,21 @@ class UserNotifierTest {
 
     @Test
     void testNotifyWithReport_WithoutCustomMessage() {
-        userNotifier.notifyWithReport("An error occurred", "/path/to/crash-report.json");
+        userNotifier.notifyWithReport("", "/path/to/crash-report.json");
 
         String logs = getAllLogs();
         assertTrue(logs.contains("Well, this is embarrassing"));
         assertTrue(logs.contains("/path/to/crash-report.json"));
-        assertFalse(logs.contains("An error occurred\n"));
+        assertTrue(logs.contains("the problem you can send us a crash report.\n\nWe have generated"),
+                "no extra paragraph should be inserted for an empty message");
+    }
+
+    @Test
+    void testNotifyWithReport_LiteralAnErrorOccurredIsShown() {
+        // Regression (B10): this string used to be silently suppressed as a placeholder.
+        userNotifier.notifyWithReport("An error occurred", "/path/to/crash-report.json");
+
+        assertTrue(getAllLogs().contains("An error occurred\n"));
     }
 
     @Test
@@ -149,8 +150,9 @@ class UserNotifierTest {
     }
 
     @Test
-    void testNotifyWithReport_WithUnknownAuthors() {
-        when(metadata.getAuthors()).thenReturn(new String[]{"Unknown"});
+    void testNotifyWithReport_WithNoAuthors() {
+        // Regression (B5): "no authors" is an empty array, not a magic "Unknown" placeholder.
+        when(metadata.getAuthors()).thenReturn(new String[0]);
 
         userNotifier.notifyWithReport("Test", "/path/to/report.json");
 
@@ -188,12 +190,12 @@ class UserNotifierTest {
     void testNotify_WithoutCustomMessage() {
         Throwable throwable = new RuntimeException("Test exception");
 
-        userNotifier.notify("An error occurred", throwable);
+        userNotifier.notify("", throwable);
 
         String logs = getAllLogs();
         assertTrue(logs.contains("Well, this is embarrassing"));
-        assertTrue(logs.contains("RuntimeException"));
-        assertFalse(logs.contains("An error occurred\n  "));
+        assertTrue(logs.contains("encountered an error:\n  RuntimeException"),
+                "the exception type should directly follow the header when there is no message");
     }
 
     @Test
@@ -240,7 +242,7 @@ class UserNotifierTest {
         };
 
         for (Exception exception : exceptions) {
-            logAppender.list.clear();
+            captured.reset();
             userNotifier.notify("Test", exception);
 
             String logs = getAllLogs();
@@ -249,11 +251,12 @@ class UserNotifierTest {
     }
 
     @Test
-    void testNotify_ContainsContinueMessage() {
+    void testNotify_DoesNotClaimApplicationContinues() {
+        // Regression (B9): the notifier cannot know whether exitCode will terminate the JVM.
         userNotifier.notify("Test", new RuntimeException("Test"));
 
         String logs = getAllLogs();
-        assertTrue(logs.contains("The application will continue running"));
+        assertFalse(logs.contains("The application will continue running"));
     }
 
     @Test

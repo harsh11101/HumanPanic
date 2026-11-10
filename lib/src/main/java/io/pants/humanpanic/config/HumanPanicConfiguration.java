@@ -4,45 +4,82 @@ import io.pants.humanpanic.interceptor.HumanPanicAspect;
 import io.pants.humanpanic.reporter.CrashReporter;
 import io.pants.humanpanic.reporter.UserNotifier;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
-import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 
 /**
- * Main configuration class for HumanPanic library
- * Enables AspectJ auto-proxying and registers all necessary beans
+ * <b>Spring integration.</b> Import this configuration to activate {@code @HumanPanic} on Spring
+ * beans:
+ *
+ * <pre>{@code
+ * @Configuration
+ * @Import(HumanPanicConfiguration.class)
+ * class AppConfig { }
+ * }</pre>
+ *
+ * <p>Your application must have {@code spring-context} (6.x) and {@code org.aspectj:aspectjweaver}
+ * on its classpath. HumanPanic does not bring them in. Application metadata is read from the
+ * {@code app.*} properties (see {@link ConfigLoader}), and messages are written to
+ * {@link System#err}.
+ *
+ * <p>All beans are explicitly declared, and their names start with {@code humanPanic} so they do
+ * not clash with your own beans. No component scanning is performed.
  */
 @Configuration
 @EnableAspectJAutoProxy
-@ComponentScan(basePackages = "io.pants.humanpanic")
 public class HumanPanicConfiguration {
 
-    /**
-     * Required for @Value annotations to work in tests and non-Spring-Boot apps
-     */
-    @Bean
-    public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
-        return new PropertySourcesPlaceholderConfigurer();
+    /** Creates the configuration (instantiated by Spring). */
+    public HumanPanicConfiguration() {
     }
 
+    /**
+     * The application metadata, populated by {@link #humanPanicConfigLoader()}.
+     *
+     * @return the shared metadata instance
+     */
     @Bean
-    public AppMetadata appMetadata() {
+    public AppMetadata humanPanicAppMetadata() {
         return new AppMetadata();
     }
 
+    /**
+     * Binds {@code app.*} properties into {@link #humanPanicAppMetadata()}.
+     *
+     * @return the loader
+     */
     @Bean
-    public CrashReporter crashReporter(ConfigLoader configLoader) {
-        return new CrashReporter(configLoader);
+    public ConfigLoader humanPanicConfigLoader() {
+        return new ConfigLoader(humanPanicAppMetadata());
     }
 
+    /**
+     * The crash report writer.
+     *
+     * @return the reporter
+     */
     @Bean
-    public UserNotifier userNotifier(ConfigLoader configLoader) {
-        return new UserNotifier(configLoader);
+    public CrashReporter humanPanicCrashReporter() {
+        return new CrashReporter(humanPanicConfigLoader());
     }
 
+    /**
+     * The user message writer.
+     *
+     * @return the notifier
+     */
     @Bean
-    public HumanPanicAspect humanPanicAspect(CrashReporter crashReporter, UserNotifier userNotifier) {
-        return new HumanPanicAspect(crashReporter, userNotifier);
+    public UserNotifier humanPanicUserNotifier() {
+        return new UserNotifier(humanPanicConfigLoader());
+    }
+
+    /**
+     * The aspect that intercepts {@code @HumanPanic} methods.
+     *
+     * @return the aspect
+     */
+    @Bean
+    public HumanPanicAspect humanPanicAspect() {
+        return new HumanPanicAspect(humanPanicCrashReporter(), humanPanicUserNotifier());
     }
 }

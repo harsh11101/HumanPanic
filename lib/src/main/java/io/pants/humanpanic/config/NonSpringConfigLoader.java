@@ -1,144 +1,131 @@
 package io.pants.humanpanic.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import lombok.Getter;
-import lombok.Setter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import io.pants.humanpanic.internal.Diagnostics;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.Properties;
 
 /**
- * Configuration loader for non-Spring environments.
- * Use this when Spring context is not available.
+ * Loads {@link AppMetadata} from {@code app.*} properties without any framework. It uses the same
+ * property names as {@link ConfigLoader}.
+ *
+ * <p>{@link #load()} reads, in increasing order of precedence:
+ * <ol>
+ *   <li>{@code application.properties} on the classpath (via the thread context class loader), or,
+ *       if it is not there, {@code ./application.properties} in the working directory;</li>
+ *   <li>JVM system properties ({@code -Dapp.name=...}).</li>
+ * </ol>
+ * Properties files are read as UTF-8. A missing or unreadable file is not an error: defaults are
+ * used.
+ *
+ * <p>Instances are not thread-safe.
  */
-@Component
-@Getter
-@Setter
 public class NonSpringConfigLoader {
 
-    @Autowired
-    private AppMetadata metadata;
+    static final String PROPERTIES_FILE = "application.properties";
+    private static final System.Logger LOG = System.getLogger(NonSpringConfigLoader.class.getName());
 
-    private void loadConfiguration() {
-        metadata = new AppMetadata();
+    private AppMetadata metadata = new AppMetadata();
 
-        // Try loading from application.yml
-        if (tryLoadYaml()) {
-            return;
-        }
-
-        // Try loading from application.properties
-        if (tryLoadProperties()) {
-            return;
-        }
-
-        // Try loading from META-INF/MANIFEST.MF
-        tryLoadManifest();
+    /** Creates a loader holding default metadata. */
+    public NonSpringConfigLoader() {
     }
 
-    private boolean tryLoadYaml() {
-        try {
-            InputStream is = getClass().getClassLoader()
-                    .getResourceAsStream("application.yml");
+    /**
+     * Loads metadata from {@code application.properties} and system properties (see the class
+     * documentation), stores it in this loader and returns it.
+     *
+     * @return the loaded metadata, never {@code null}
+     */
+    public AppMetadata load() {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+            classLoader = NonSpringConfigLoader.class.getClassLoader();
+        }
+        return load(classLoader, Paths.get(PROPERTIES_FILE));
+    }
 
-            if (is == null) {
-                Path yamlPath = Paths.get("application.yml");
-                if (Files.exists(yamlPath)) {
-                    is = Files.newInputStream(yamlPath);
+    /**
+     * Builds metadata only from the given properties (system properties are <em>not</em> consulted),
+     * stores it in this loader and returns it.
+     *
+     * @param properties the properties holding {@code app.*} keys; must not be {@code null}
+     * @return the loaded metadata, never {@code null}
+     */
+    public AppMetadata load(Properties properties) {
+        Objects.requireNonNull(properties, "properties");
+        this.metadata = toMetadata(properties);
+        return metadata;
+    }
+
+    AppMetadata load(ClassLoader classLoader, Path fallbackFile) {
+        Properties properties = new Properties();
+        readInto(properties, classLoader, fallbackFile);
+        for (String key : System.getProperties().stringPropertyNames()) {
+            if (key.startsWith("app.")) {
+                properties.setProperty(key, System.getProperty(key));
+            }
+        }
+        this.metadata = toMetadata(properties);
+        return metadata;
+    }
+
+    private static void readInto(Properties properties, ClassLoader classLoader, Path fallbackFile) {
+        try (InputStream resource = classLoader == null ? null : classLoader.getResourceAsStream(PROPERTIES_FILE)) {
+            if (resource != null) {
+                load(properties, resource);
+                return;
+            }
+            if (Files.isRegularFile(fallbackFile)) {
+                try (InputStream file = Files.newInputStream(fallbackFile)) {
+                    load(properties, file);
                 }
             }
-
-            if (is != null) {
-                ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-                YamlConfig config = mapper.readValue(is, YamlConfig.class);
-
-                if (config.getApp() != null) {
-                    AppConfig app = config.getApp();
-                    if (app.getName() != null) metadata.setName(app.getName());
-                    if (app.getVersion() != null) metadata.setVersion(app.getVersion());
-                    if (app.getAuthors() != null) metadata.setAuthors(app.getAuthors());
-                    if (app.getHomepage() != null) metadata.setHomepage(app.getHomepage());
-                    if (app.getSupportUrl() != null) metadata.setSupportUrl(app.getSupportUrl());
-                    if (app.getIssueUrl() != null) metadata.setIssueUrl(app.getIssueUrl());
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            // Silent failure
-        }
-        return false;
-    }
-
-    private boolean tryLoadProperties() {
-        try {
-            Properties props = new Properties();
-            InputStream is = getClass().getClassLoader()
-                    .getResourceAsStream("application.properties");
-
-            if (is == null) {
-                Path propsPath = Paths.get("application.properties");
-                if (Files.exists(propsPath)) {
-                    is = Files.newInputStream(propsPath);
-                }
-            }
-
-            if (is != null) {
-                props.load(is);
-                metadata.setName(props.getProperty("app.name", metadata.getName()));
-                metadata.setVersion(props.getProperty("app.version", metadata.getVersion()));
-
-                String authors = props.getProperty("app.authors");
-                if (authors != null) {
-                    metadata.setAuthors(authors.split(",\\s*"));
-                }
-
-                metadata.setHomepage(props.getProperty("app.homepage", metadata.getHomepage()));
-                metadata.setSupportUrl(props.getProperty("app.support-url", metadata.getSupportUrl()));
-                metadata.setIssueUrl(props.getProperty("app.issue-url", metadata.getIssueUrl()));
-                return true;
-            }
-        } catch (Exception e) {
-            // Silent failure
-        }
-        return false;
-    }
-
-    private void tryLoadManifest() {
-        try {
-            Package pkg = getClass().getPackage();
-            if (pkg != null) {
-                String name = pkg.getImplementationTitle();
-                String version = pkg.getImplementationVersion();
-
-                if (name != null) metadata.setName(name);
-                if (version != null) metadata.setVersion(version);
-            }
-        } catch (Exception e) {
-            // Silent failure
+        } catch (IOException | IllegalArgumentException e) {
+            Diagnostics.warn(LOG, "HumanPanic: could not read " + PROPERTIES_FILE + "; using defaults", e);
         }
     }
 
-    // Helper classes for YAML parsing
-    @Getter
-    @Setter
-    private static class YamlConfig {
-        private AppConfig app;
+    private static void load(Properties properties, InputStream in) throws IOException {
+        try (Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
     }
 
-    @Getter
-    @Setter
-    private static class AppConfig {
-        private String name;
-        private String version;
-        private String[] authors;
-        private String homepage;
-        private String supportUrl;
-        private String issueUrl;
+    private static AppMetadata toMetadata(Properties p) {
+        AppMetadata m = new AppMetadata();
+        m.setName(p.getProperty("app.name", m.getName()));
+        m.setVersion(p.getProperty("app.version", m.getVersion()));
+        m.setAuthors(AppMetadata.parseAuthors(p.getProperty("app.authors")));
+        m.setHomepage(p.getProperty("app.homepage", ""));
+        m.setSupportUrl(p.getProperty("app.support-url", ""));
+        m.setIssueUrl(p.getProperty("app.issue-url", ""));
+        return m;
+    }
+
+    /**
+     * Returns the metadata produced by the last {@code load} call, or the metadata set explicitly.
+     *
+     * @return the current metadata (default metadata until loaded)
+     */
+    public AppMetadata getMetadata() {
+        return metadata;
+    }
+
+    /**
+     * Replaces the current metadata.
+     *
+     * @param metadata the metadata
+     */
+    public void setMetadata(AppMetadata metadata) {
+        this.metadata = metadata;
     }
 }

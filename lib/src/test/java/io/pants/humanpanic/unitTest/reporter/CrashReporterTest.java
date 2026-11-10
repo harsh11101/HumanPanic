@@ -195,7 +195,7 @@ class CrashReporterTest {
         Throwable throwable = new RuntimeException("Test exception");
 
         String reportPath1 = crashReporter.createReport(throwable, testMethod);
-        Thread.sleep(1000); // Ensure different timestamp
+        // Regression (B3): no sleep needed; same-millisecond reports get distinct names.
         String reportPath2 = crashReporter.createReport(throwable, testMethod);
 
         assertNotEquals(reportPath1, reportPath2);

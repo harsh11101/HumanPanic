@@ -42,12 +42,19 @@ class HumanPanicAspectTest {
         when(joinPoint.getSignature()).thenReturn(methodSignature);
     }
 
+    /** Calls the advice the way Spring does: with the annotation bound from the target method. */
+    private Object invokeAdvice() throws Throwable {
+        Method method = methodSignature.getMethod();
+        HumanPanic annotation = method == null ? null : method.getAnnotation(HumanPanic.class);
+        return aspect.handlePanic(joinPoint, annotation);
+    }
+
     @Test
     void testHandlePanic_SuccessfulExecution() throws Throwable {
         Object expectedResult = "Success";
         when(joinPoint.proceed()).thenReturn(expectedResult);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals(expectedResult, result);
         verify(joinPoint).proceed();
@@ -65,7 +72,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getReturnType()).thenReturn(void.class);
         when(crashReporter.createReport(any(), any())).thenReturn("/path/to/report.json");
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertNull(result);
         verify(crashReporter).createReport(exception, method);
@@ -81,7 +88,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(method);
         when(methodSignature.getReturnType()).thenReturn(void.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertNull(result);
         verify(crashReporter, never()).createReport(any(), any());
@@ -97,7 +104,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(method);
         when(methodSignature.getReturnType()).thenReturn(void.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertNull(result);
         verifyNoInteractions(userNotifier);
@@ -112,9 +119,10 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(method);
         when(methodSignature.getReturnType()).thenReturn(void.class);
 
-        aspect.handlePanic(joinPoint);
+        invokeAdvice();
 
-        // Stack trace should be printed - difficult to verify, but method should complete
+        // The stack trace goes to the same stream as the user message.
+        verify(userNotifier).printStackTrace(exception);
         verify(crashReporter, never()).createReport(any(), any());
     }
 
@@ -128,7 +136,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getReturnType()).thenReturn(void.class);
         when(crashReporter.createReport(any(), any())).thenReturn("/path/to/report.json");
 
-        aspect.handlePanic(joinPoint);
+        invokeAdvice();
 
         verify(userNotifier).notifyWithReport(eq("Custom error message"), anyString());
     }
@@ -142,7 +150,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(intMethod);
         when(methodSignature.getReturnType()).thenReturn(int.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals(0, result);
     }
@@ -156,7 +164,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(booleanMethod);
         when(methodSignature.getReturnType()).thenReturn(boolean.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals(false, result);
     }
@@ -170,7 +178,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(longMethod);
         when(methodSignature.getReturnType()).thenReturn(long.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals(0L, result);
     }
@@ -184,7 +192,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(floatMethod);
         when(methodSignature.getReturnType()).thenReturn(float.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals(0.0f, result);
     }
@@ -198,7 +206,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(doubleMethod);
         when(methodSignature.getReturnType()).thenReturn(double.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals(0.0d, result);
     }
@@ -212,7 +220,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(charMethod);
         when(methodSignature.getReturnType()).thenReturn(char.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals('\u0000', result);
     }
@@ -226,7 +234,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(byteMethod);
         when(methodSignature.getReturnType()).thenReturn(byte.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals((byte) 0, result);
     }
@@ -240,7 +248,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(shortMethod);
         when(methodSignature.getReturnType()).thenReturn(short.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertEquals((short) 0, result);
     }
@@ -254,7 +262,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getMethod()).thenReturn(stringMethod);
         when(methodSignature.getReturnType()).thenReturn(String.class);
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertNull(result);
     }
@@ -269,7 +277,7 @@ class HumanPanicAspectTest {
         when(methodSignature.getReturnType()).thenReturn(void.class);
         when(crashReporter.createReport(any(), any())).thenReturn("/path/to/report.json");
 
-        Object result = aspect.handlePanic(joinPoint);
+        Object result = invokeAdvice();
 
         assertNull(result);
     }
@@ -290,7 +298,7 @@ class HumanPanicAspectTest {
 
         for (Exception exception : exceptions) {
             doThrow(exception).when(joinPoint).proceed();
-            aspect.handlePanic(joinPoint);
+            invokeAdvice();
             verify(crashReporter).createReport(eq(exception), eq(method));
         }
     }

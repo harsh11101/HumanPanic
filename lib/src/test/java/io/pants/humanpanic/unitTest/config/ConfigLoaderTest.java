@@ -75,13 +75,13 @@ class ConfigLoaderTest {
     @Test
     void testSetAppAuthors_EmptyString() {
         setFieldsAndInit("Unknown", "Unknown", "", "", "", "");
-        assertArrayEquals(new String[]{"Unknown"}, metadata.getAuthors());
+        assertArrayEquals(new String[0], metadata.getAuthors());
     }
 
     @Test
     void testSetAppAuthors_NullValue() {
         setFieldsAndInit("Unknown", "Unknown", null, "", "", "");
-        assertArrayEquals(new String[]{"Unknown"}, metadata.getAuthors());
+        assertArrayEquals(new String[0], metadata.getAuthors());
     }
 
     @Test

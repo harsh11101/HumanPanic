@@ -202,7 +202,8 @@ class HumanPanicProxyTest {
 
         wrapped.methodWithEmptyMessage();
 
-        verify(userNotifier).notifyWithReport(eq("An error occurred"), anyString());
+        // Regression (B10): an empty message is passed through as-is; no magic placeholder string.
+        verify(userNotifier).notifyWithReport(eq(""), anyString());
     }
 
     @Test

@@ -61,15 +61,6 @@ class NonSpringConfigLoaderTest {
     }
 
     @Test
-    void testYamlConfig_InnerClass() {
-        // Test that inner classes are accessible
-        assertDoesNotThrow(() -> {
-            Class.forName("io.pants.humanpanic.config.NonSpringConfigLoader$YamlConfig");
-            Class.forName("io.pants.humanpanic.config.NonSpringConfigLoader$AppConfig");
-        });
-    }
-
-    @Test
     void testConfigLoader_WithSystemProperties() {
         System.setProperty("app.name", "System Property App");
         System.setProperty("app.version", "2.0.0");

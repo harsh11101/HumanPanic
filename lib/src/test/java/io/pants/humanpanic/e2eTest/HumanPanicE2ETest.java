@@ -1,23 +1,24 @@
 package io.pants.humanpanic.e2eTest;
 
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import io.pants.humanpanic.HumanPanic;
 import io.pants.humanpanic.config.HumanPanicConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * End-to-End tests for HumanPanic - No mocking, real annotation processing
  */
 @ExtendWith(SpringExtension.class)
-@ContextConfiguration(classes = HumanPanicConfiguration.class)
+@ContextConfiguration(classes = HumanPanicE2ETest.E2EConfig.class)
 @TestPropertySource(properties = {
         "app.name=E2E Test Application",
         "app.version=2.0.0-e2e",
@@ -49,28 +50,21 @@ class HumanPanicE2ETest {
     @Autowired
     private TestService testService;
 
-    private ListAppender<ILoggingEvent> logAppender;
-    private Logger userNotifierLogger;
+    private final ByteArrayOutputStream captured = new ByteArrayOutputStream();
+    private PrintStream originalErr;
     private static final String CRASH_REPORTS_DIR = "crash-reports";
 
     @BeforeEach
-    void setUp() {
-        // Setup log capturing
-        userNotifierLogger = (Logger) LoggerFactory.getLogger("io.pants.humanpanic.reporter.UserNotifier");
-        logAppender = new ListAppender<>();
-        logAppender.start();
-        userNotifierLogger.addAppender(logAppender);
-        logAppender.list.clear();
-        assertTrue(logAppender.list.isEmpty(), "Log appender should be empty before test");
+    void setUp() throws IOException {
+        // User messages go to System.err; capture them.
+        cleanupCrashReports();
+        originalErr = System.err;
+        System.setErr(new PrintStream(captured, true, StandardCharsets.UTF_8));
     }
 
     @AfterEach
     void tearDown() throws IOException {
-        // Clean up log appender
-        if (logAppender != null) {
-            userNotifierLogger.detachAppender(logAppender);
-            logAppender.stop();
-        }
+        System.setErr(originalErr);
 
         // Clean up crash reports
         cleanupCrashReports();
@@ -94,10 +88,9 @@ class HumanPanicE2ETest {
         assertReportContainsExpectedData(reportContent, "methodWithDefaultConfig");
 
         // Verify logs were created
-        List<ILoggingEvent> logEvents = logAppender.list;
-        assertFalse(logEvents.isEmpty(), "Should have logged error messages");
+        assertFalse(capturedOutput().isEmpty(), "Should have logged error messages");
 
-        String allLogs = getAllLogs(logEvents);
+        String allLogs = capturedOutput();
         assertTrue(allLogs.contains("Well, this is embarrassing"), "Should contain embarrassing message");
         assertTrue(allLogs.contains("E2E Test Application"), "Should contain app name");
         assertTrue(allLogs.contains(reports[0].getAbsolutePath()), "Should contain report path");
@@ -107,8 +100,7 @@ class HumanPanicE2ETest {
     void testCustomMessage_AppearsInLogs() {
         testService.methodWithCustomMessage();
 
-        List<ILoggingEvent> logEvents = logAppender.list;
-        String allLogs = getAllLogs(logEvents);
+        String allLogs = capturedOutput();
 
         assertTrue(allLogs.contains("Database connection failed"), "Should contain custom message");
         assertTrue(allLogs.contains("E2E Test Application"), "Should contain app name");
@@ -126,10 +118,9 @@ class HumanPanicE2ETest {
         }
 
         // Verify error was logged
-        List<ILoggingEvent> logEvents = logAppender.list;
-        assertFalse(logEvents.isEmpty(), "Should have logged error messages");
+        assertFalse(capturedOutput().isEmpty(), "Should have logged error messages");
 
-        String allLogs = getAllLogs(logEvents);
+        String allLogs = capturedOutput();
         assertTrue(allLogs.contains("Well, this is embarrassing"), "Should contain error message");
         assertTrue(allLogs.contains("RuntimeException"), "Should mention exception type");
     }
@@ -144,8 +135,7 @@ class HumanPanicE2ETest {
         assertEquals(1, reports != null ? reports.length : 0, "Should still create crash report in silent mode");
 
         // Verify no user notification logs (only internal logs might exist)
-        List<ILoggingEvent> logEvents = logAppender.list;
-        String allLogs = getAllLogs(logEvents);
+        String allLogs = capturedOutput();
 
         // Should not contain user-facing messages
         assertFalse(allLogs.contains("Well, this is embarrassing"), "Should not log user-facing messages in silent mode");
@@ -206,8 +196,7 @@ class HumanPanicE2ETest {
     void testLogsContainAllRequiredInformation() {
         testService.methodWithCustomMessage();
 
-        List<ILoggingEvent> logEvents = logAppender.list;
-        String allLogs = getAllLogs(logEvents);
+        String allLogs = capturedOutput();
 
         // Verify all required log components
         assertTrue(allLogs.contains("Well, this is embarrassing"), "Should have opening message");
@@ -225,12 +214,11 @@ class HumanPanicE2ETest {
     }
 
     @Test
-    void testMultipleCrashReports_UniqueFilenames() throws InterruptedException {
+    void testMultipleCrashReports_UniqueFilenames() {
         // Create multiple crash reports
+        // Regression (B3): back-to-back failures must not overwrite each other's report.
         testService.methodWithDefaultConfig();
-        Thread.sleep(1100); // Ensure different timestamp
         testService.methodWithCustomMessage();
-        Thread.sleep(1100);
         testService.methodReturningString();
 
         File crashReportsDir = new File(CRASH_REPORTS_DIR);
@@ -278,8 +266,7 @@ class HumanPanicE2ETest {
     void testEmptyMessageUsesDefault() {
         testService.methodWithEmptyMessage();
 
-        List<ILoggingEvent> logEvents = logAppender.list;
-        String allLogs = getAllLogs(logEvents);
+        String allLogs = capturedOutput();
 
         // Should use default "An error occurred" message
         assertTrue(allLogs.contains("Well, this is embarrassing"), "Should have default opening");
@@ -337,10 +324,8 @@ class HumanPanicE2ETest {
         assertTrue(reportContent.contains("RuntimeException"), "Should contain exception type");
     }
 
-    private String getAllLogs(List<ILoggingEvent> logEvents) {
-        return logEvents.stream()
-                .map(ILoggingEvent::getFormattedMessage)
-                .collect(Collectors.joining("\n"));
+    private String capturedOutput() {
+        return captured.toString(StandardCharsets.UTF_8);
     }
 
     private String readFile(Path path) {
@@ -371,10 +356,19 @@ class HumanPanicE2ETest {
         }
     }
 
+    /** Registers the library configuration and the test bean explicitly (no component scanning). */
+    @Configuration
+    @Import(HumanPanicConfiguration.class)
+    static class E2EConfig {
+        @Bean
+        TestService testService() {
+            return new TestService();
+        }
+    }
+
     /**
      * Test service with various @HumanPanic configurations
      */
-    @Service
     public static class TestService {
 
         @HumanPanic

@@ -1,81 +1,64 @@
 package io.pants.humanpanic.interceptor;
 
 import io.pants.humanpanic.HumanPanic;
+import io.pants.humanpanic.internal.PanicResponder;
 import io.pants.humanpanic.reporter.CrashReporter;
 import io.pants.humanpanic.reporter.UserNotifier;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.springframework.stereotype.Component;
+import org.springframework.aop.support.AopUtils;
 
 import java.lang.reflect.Method;
 
 /**
- * AspectJ aspect that intercepts methods annotated with @HumanPanic
- * and provides human-friendly error handling
+ * <b>Spring AOP integration.</b> Applies {@link HumanPanic} handling to annotated methods of
+ * Spring beans. Registered by {@link io.pants.humanpanic.config.HumanPanicConfiguration}.
+ *
+ * <p>The usual Spring AOP proxy rules apply: only calls that go through the Spring proxy are
+ * intercepted. Self-invocation ({@code this.method()}) and non-public methods are not.
+ *
+ * <p>Needs {@code spring-aop} and {@code aspectjweaver} on the classpath. Native AspectJ weaving
+ * (ajc or load-time weaving) is not supported.
  */
 @Aspect
-@Component
-@RequiredArgsConstructor
-@Slf4j
 public class HumanPanicAspect {
 
-    private final CrashReporter crashReporter;
-    private final UserNotifier userNotifier;
+    private final PanicResponder responder;
 
-    @Around("@annotation(io.pants.humanpanic.HumanPanic)")
-    public Object handlePanic(ProceedingJoinPoint joinPoint) throws Throwable {
+    /**
+     * Creates the aspect.
+     *
+     * @param crashReporter writes crash reports; must not be {@code null}
+     * @param userNotifier  writes user messages; must not be {@code null}
+     */
+    public HumanPanicAspect(CrashReporter crashReporter, UserNotifier userNotifier) {
+        this.responder = new PanicResponder(crashReporter, userNotifier);
+    }
+
+    /**
+     * Around advice for {@code @HumanPanic} methods. The annotation is bound by the pointcut, so it
+     * is found even when the bean is proxied through an interface.
+     *
+     * @param joinPoint  the intercepted call
+     * @param humanPanic the annotation on the target method ({@code null} means defaults)
+     * @return the method's result, or its default return value after a handled failure
+     * @throws Throwable if the failure is a {@link VirtualMachineError}
+     */
+    @Around("@annotation(humanPanic)")
+    public Object handlePanic(ProceedingJoinPoint joinPoint, HumanPanic humanPanic) throws Throwable {
         try {
             return joinPoint.proceed();
-        } catch (Throwable throwable) {
+        } catch (Throwable failure) {
             MethodSignature signature = (MethodSignature) joinPoint.getSignature();
             Method method = signature.getMethod();
-            HumanPanic annotation = method.getAnnotation(HumanPanic.class);
-
-            handleException(throwable, annotation, method);
-
-            if (annotation.exitCode() != 0) {
-                System.exit(annotation.exitCode());
+            Object target = joinPoint.getTarget();
+            if (method != null && target != null) {
+                // With JDK proxies the signature names the interface method; report the implementation.
+                method = AopUtils.getMostSpecificMethod(method, AopUtils.getTargetClass(target));
             }
-
-            return getDefaultReturnValue(signature.getReturnType());
+            return responder.recover(failure, humanPanic, method, signature.getReturnType());
         }
-    }
-
-    private void handleException(Throwable throwable, HumanPanic annotation, Method method) {
-        if (annotation.createCrashReport()) {
-            String reportPath = crashReporter.createReport(throwable, method);
-            if (!annotation.silent()) {
-                String message = annotation.message().isEmpty() ?
-                        "An error occurred" : annotation.message();
-                userNotifier.notifyWithReport(message, reportPath);
-            }
-        } else if (!annotation.silent()) {
-            String message = annotation.message().isEmpty() ?
-                    "An error occurred" : annotation.message();
-            userNotifier.notify(message, throwable);
-        }
-
-        if (annotation.printStackTrace()) {
-            throwable.printStackTrace();
-        }
-    }
-
-    private Object getDefaultReturnValue(Class<?> returnType) {
-        if (returnType == void.class || returnType == Void.class) return null;
-        if (returnType.isPrimitive()) {
-            if (returnType == boolean.class) return false;
-            if (returnType == byte.class) return (byte) 0;
-            if (returnType == short.class) return (short) 0;
-            if (returnType == int.class) return 0;
-            if (returnType == long.class) return 0L;
-            if (returnType == float.class) return 0.0f;
-            if (returnType == double.class) return 0.0d;
-            if (returnType == char.class) return '\u0000';
-        }
-        return null;
     }
 }

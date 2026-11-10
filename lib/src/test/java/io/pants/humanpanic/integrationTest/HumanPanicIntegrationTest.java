@@ -196,7 +196,7 @@ class HumanPanicIntegrationTest {
         java.lang.reflect.Method method = TestService.class.getMethod("testMethod");
 
         String report1 = crashReporter.createReport(exception, method);
-        Thread.sleep(1100); // Ensure different timestamp
+        // Regression (B3): no sleep needed between reports.
         String report2 = crashReporter.createReport(exception, method);
 
         assertNotEquals(report1, report2);

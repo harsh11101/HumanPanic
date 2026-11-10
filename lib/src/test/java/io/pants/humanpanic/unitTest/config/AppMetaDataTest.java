@@ -25,10 +25,12 @@ public class AppMetaDataTest {
     void testDefaultValues() {
         assertEquals("Unknown Application", metadata.getName());
         assertEquals("Unknown Version", metadata.getVersion());
-        assertArrayEquals(new String[]{"Unknown Authors"}, metadata.getAuthors());
-        assertEquals("Unknown Homepage", metadata.getHomepage());
-        assertEquals("Unknown Support-URL", metadata.getSupportUrl());
-        assertEquals("Unknown Issue_URL", metadata.getIssueUrl());
+        // Regression (B5): optional fields default to "not provided", not to placeholder text
+        // that would be shown to users ("Get help at: Unknown Support-URL").
+        assertArrayEquals(new String[0], metadata.getAuthors());
+        assertEquals("", metadata.getHomepage());
+        assertEquals("", metadata.getSupportUrl());
+        assertEquals("", metadata.getIssueUrl());
     }
 
     @Test
