@@ -6,8 +6,8 @@ dependencies {
     implementation "com.github.harsh11101:HumanPanic:${humanPanicVersion}"
     // The Spring integration needs these on the application's classpath; HumanPanic does not
     // bring them in transitively.
-    implementation 'org.springframework:spring-context:6.2.12'
-    implementation 'org.aspectj:aspectjweaver:1.9.24'
+    implementation 'org.springframework:spring-context:7.0.10'
+    implementation 'org.aspectj:aspectjweaver:1.9.27'
 }
 
 tasks.withType(JavaCompile).configureEach {
