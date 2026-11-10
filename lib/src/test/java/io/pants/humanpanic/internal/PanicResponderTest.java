@@ -190,6 +190,22 @@ class PanicResponderTest {
         assertNull(PanicResponder.defaultValue(null));
     }
 
+    @Test
+    void defaultValueOfOptionalAndCollectionTypesIsEmptyNotNull() {
+        assertEquals(java.util.Optional.empty(), PanicResponder.defaultValue(java.util.Optional.class));
+        assertEquals(java.util.OptionalInt.empty(), PanicResponder.defaultValue(java.util.OptionalInt.class));
+        assertEquals(java.util.OptionalLong.empty(), PanicResponder.defaultValue(java.util.OptionalLong.class));
+        assertEquals(java.util.OptionalDouble.empty(), PanicResponder.defaultValue(java.util.OptionalDouble.class));
+        assertEquals(java.util.List.of(), PanicResponder.defaultValue(java.util.List.class));
+        assertEquals(java.util.List.of(), PanicResponder.defaultValue(java.util.Collection.class));
+        assertEquals(java.util.List.of(), PanicResponder.defaultValue(Iterable.class));
+        assertEquals(java.util.Set.of(), PanicResponder.defaultValue(java.util.Set.class));
+        assertEquals(java.util.Map.of(), PanicResponder.defaultValue(java.util.Map.class));
+        // A concrete or more specific type cannot be given a safe empty instance.
+        assertNull(PanicResponder.defaultValue(java.util.ArrayList.class));
+        assertNull(PanicResponder.defaultValue(java.util.SortedSet.class));
+    }
+
     public static class Annotated {
         @HumanPanic(silent = true) public void silent() { }
         @HumanPanic(createCrashReport = false, message = "short") public void noReport() { }

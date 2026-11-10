@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Library and demo dependencies.
+  - package-ecosystem: gradle
+    directories: ["/", "/demo"]
+    schedule:
+      interval: monthly
+    groups:
+      gradle:
+        patterns: ["*"]
+
+  # Actions used by the CI workflow.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

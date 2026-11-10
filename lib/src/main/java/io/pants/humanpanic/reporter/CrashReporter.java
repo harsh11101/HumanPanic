@@ -14,7 +14,8 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -60,14 +61,14 @@ public class CrashReporter {
 
     /**
      * Creates a reporter that reads metadata from a {@link ConfigLoader} (Spring integration) and
-     * writes to {@value #DEFAULT_REPORT_DIRECTORY}.
+     * writes to its {@code humanpanic.report-dir} (default {@value #DEFAULT_REPORT_DIRECTORY}).
      *
      * @param configLoader the metadata source; must not be {@code null}
      */
     public CrashReporter(ConfigLoader configLoader) {
         Objects.requireNonNull(configLoader, "configLoader");
         this.metadata = configLoader::getMetadata;
-        this.reportDirectory = Paths.get(DEFAULT_REPORT_DIRECTORY);
+        this.reportDirectory = Paths.get(configLoader.getReportDirectory());
     }
 
     /**
@@ -122,13 +123,26 @@ public class CrashReporter {
             String suffix = Integer.toHexString(ThreadLocalRandom.current().nextInt(0x100000, 0x1000000));
             Path path = reportDirectory.resolve("crash-" + stamp + "-" + suffix + ".json");
             try {
-                return Files.write(path, json, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+                // createFile is atomic: it fails if the name is taken, so reports never overwrite.
+                return Files.write(Files.createFile(path, ownerOnly(path)), json);
             } catch (FileAlreadyExistsException e) {
                 if (attempt >= MAX_NAME_ATTEMPTS) {
                     throw e;
                 }
             }
         }
+    }
+
+    /**
+     * Reports can contain sensitive data, so on POSIX file systems they are readable and writable
+     * by the owner only. Elsewhere (Windows) the directory's permissions apply.
+     */
+    private static FileAttribute<?>[] ownerOnly(Path path) {
+        if (path.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            return new FileAttribute<?>[]{
+                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))};
+        }
+        return new FileAttribute<?>[0];
     }
 
     private CrashReport generateReport(Throwable throwable, Method method, OffsetDateTime now) {

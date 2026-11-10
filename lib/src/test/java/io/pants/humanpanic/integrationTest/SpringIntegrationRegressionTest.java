@@ -39,6 +39,9 @@ class SpringIntegrationRegressionTest {
         @HumanPanic(message = "Greeting failed.")
         @Override
         public String greet(String name) {
+            if ("friend".equals(name)) {
+                return "hello friend";
+            }
             throw new IllegalStateException("no greeting for " + name);
         }
     }
@@ -99,6 +102,16 @@ class SpringIntegrationRegressionTest {
     }
 
     @Test
+    void successfulCallPassesThroughUntouched() {
+        try (AnnotationConfigApplicationContext ctx =
+                     new AnnotationConfigApplicationContext(PlainSpringConfig.class)) {
+            assertEquals("hello friend", ctx.getBean(Greeter.class).greet("friend"));
+        }
+        assertEquals("", err.toString(StandardCharsets.UTF_8));
+        assertFalse(Files.exists(Path.of("crash-reports")));
+    }
+
+    @Test
     void interfaceBeanBehindJdkProxyIsHandled() {
         // Regression (B1): with plain @EnableAspectJAutoProxy, interface beans get JDK proxies and
         // the aspect used to fail with an NPE because it read the annotation from the interface.
@@ -128,10 +141,12 @@ class SpringIntegrationRegressionTest {
     }
 
     @Test
-    void springBootContextWithPropertiesAndCollidingBeanNames() {
+    void springBootContextWithPropertiesAndCollidingBeanNames(
+            @org.junit.jupiter.api.io.TempDir Path reportDir) throws IOException {
         try (ConfigurableApplicationContext ctx = new SpringApplicationBuilder(BootConfig.class)
                 .web(WebApplicationType.NONE)
-                .properties("app.name=Boot Tool", "app.authors=Ada, Linus", "spring.main.banner-mode=off")
+                .properties("app.name=Boot Tool", "app.authors=Ada, Linus", "spring.main.banner-mode=off",
+                        "humanpanic.report-dir=" + reportDir)
                 .logStartupInfo(false)
                 .run()) {
 
@@ -143,6 +158,12 @@ class SpringIntegrationRegressionTest {
             String out = err.toString(StandardCharsets.UTF_8);
             assertTrue(out.contains("Boot Tool had a problem and crashed"), out);
             assertTrue(out.contains("Ada\n") && out.contains("Linus\n"), out);
+
+            // humanpanic.report-dir moves the reports out of ./crash-reports.
+            try (Stream<Path> reports = Files.list(reportDir)) {
+                assertEquals(1, reports.count());
+            }
+            assertFalse(Files.exists(Path.of("crash-reports")));
         }
     }
 

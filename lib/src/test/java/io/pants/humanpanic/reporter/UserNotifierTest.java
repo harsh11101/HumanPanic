@@ -1,8 +1,7 @@
-package io.pants.humanpanic.unitTest.reporter;
+package io.pants.humanpanic.reporter;
 
 import io.pants.humanpanic.config.AppMetadata;
 import io.pants.humanpanic.config.ConfigLoader;
-import io.pants.humanpanic.reporter.UserNotifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

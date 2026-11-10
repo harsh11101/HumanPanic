@@ -165,6 +165,18 @@ class HumanPanicProxyBehaviourTest {
     }
 
     @Test
+    void wrapAndUnwrapRejectInvalidArguments() {
+        assertThrows(IllegalArgumentException.class, () -> HumanPanicProxy.wrap(null, reporter, notifier));
+        assertThrows(IllegalArgumentException.class,
+                () -> HumanPanicProxy.wrap(null, Service.class, reporter, notifier));
+        assertThrows(IllegalArgumentException.class,
+                () -> HumanPanicProxy.wrap(new ServiceImpl(), null, reporter, notifier));
+        assertThrows(IllegalArgumentException.class,
+                () -> HumanPanicProxy.wrap(new Object(), Service.class, reporter, notifier));
+        assertThrows(IllegalArgumentException.class, () -> HumanPanicProxy.unwrap(new ServiceImpl()));
+    }
+
+    @Test
     void wrapRejectsConcreteClassAsInterface() {
         assertThrows(IllegalArgumentException.class,
                 () -> HumanPanicProxy.wrap(new ServiceImpl(), ServiceImpl.class, reporter, notifier));

@@ -1,4 +1,4 @@
-package io.pants.humanpanic.e2eTest;
+package io.pants.humanpanic.integrationTest;
 
 import io.pants.humanpanic.HumanPanic;
 import io.pants.humanpanic.config.HumanPanicConfiguration;

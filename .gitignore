@@ -7,7 +7,6 @@ build
 # Crash reports written by local runs
 crash-reports/
 
-CHANGELOG.md
 FINAL_REVIEW.md
 PROJECT_AUDIT.md
 

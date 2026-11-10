@@ -67,6 +67,19 @@ You can contribute by:
    * [ ] Changes described clearly in the PR description
    * [ ] If applicable, link issue(s) addressed by the PR
 
+## Releasing
+
+Releases are automatic. Every push to `main` that passes CI:
+
+1. tags the commit with the `version` from `gradle.properties`, if that tag does not exist yet;
+2. moves the `latest` tag to that commit;
+3. asks [JitPack](https://jitpack.io/#harsh11101/HumanPanic) to build the version, and fails if
+   JitPack cannot.
+
+So to release, change `version=` in `gradle.properties` (and the version in `README.md` and
+`demo/gradle.properties`) and push to `main`. A version tag is never moved: pushing more commits
+without changing the version only moves `latest`.
+
 ## Issue Reporting
 
 When you open an issue, please include:

@@ -18,6 +18,12 @@ repositories {
     mavenCentral()
 }
 
+// Mockito's inline mock maker is attached as a real agent: JDK 21+ warns about (and later JDKs
+// forbid) an agent that loads itself at runtime.
+configurations {
+    mockitoAgent
+}
+
 def springVersion = '6.2.12'
 def aspectjVersion = '1.9.24'
 def jacksonVersion = '2.17.1'
@@ -39,6 +45,7 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.20.0'
+    mockitoAgent('org.mockito:mockito-core:5.20.0') { transitive = false }
     testImplementation "org.springframework:spring-context:${springVersion}"
     testImplementation "org.springframework:spring-test:${springVersion}"
     testImplementation "org.aspectj:aspectjweaver:${aspectjVersion}"
@@ -61,6 +68,7 @@ tasks.named('javadoc', Javadoc) {
 
 tasks.named('test', Test) {
     useJUnitPlatform()
+    jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
     // Tests write crash reports relative to the working directory; keep them inside build/.
     def testWorkDir = layout.buildDirectory.dir('test-work')
     workingDir = testWorkDir

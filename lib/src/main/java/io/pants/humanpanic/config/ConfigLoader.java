@@ -24,6 +24,8 @@ import org.springframework.beans.factory.annotation.Value;
  */
 public class ConfigLoader implements InitializingBean {
 
+    private static final String DEFAULT_REPORT_DIRECTORY = "crash-reports";
+
     private final AppMetadata metadata;
 
     @Value("${app.name:" + AppMetadata.DEFAULT_NAME + "}")
@@ -43,6 +45,9 @@ public class ConfigLoader implements InitializingBean {
 
     @Value("${app.issue-url:}")
     private String appIssueUrl;
+
+    @Value("${humanpanic.report-dir:" + DEFAULT_REPORT_DIRECTORY + "}")
+    private String reportDirectory;
 
     /**
      * Creates a loader that populates the given metadata instance.
@@ -137,6 +142,16 @@ public class ConfigLoader implements InitializingBean {
      */
     public String getAppIssueUrl() {
         return appIssueUrl;
+    }
+
+    /**
+     * Returns the directory crash reports are written to: the {@code humanpanic.report-dir}
+     * property, or {@code crash-reports} if it is not set.
+     *
+     * @return the report directory; never blank
+     */
+    public String getReportDirectory() {
+        return reportDirectory == null || reportDirectory.isBlank() ? DEFAULT_REPORT_DIRECTORY : reportDirectory;
     }
 
     private static String nullToEmpty(String s) {

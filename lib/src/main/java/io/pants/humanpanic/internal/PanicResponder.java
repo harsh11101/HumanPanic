@@ -5,7 +5,15 @@ import io.pants.humanpanic.reporter.CrashReporter;
 import io.pants.humanpanic.reporter.UserNotifier;
 
 import java.lang.reflect.Method;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.IntConsumer;
 
 /**
@@ -90,7 +98,8 @@ public final class PanicResponder {
      *   <li>restore the interrupt flag if it is an {@link InterruptedException};</li>
      *   <li>exit the JVM if {@code exitCode != 0};</li>
      *   <li>rethrow it if it is a {@link VirtualMachineError};</li>
-     *   <li>otherwise return the default value for {@code returnType}.</li>
+     *   <li>otherwise return the default value for {@code returnType} (see
+     *       {@link #defaultValue}).</li>
      * </ol>
      *
      * @param failure    the failure
@@ -117,15 +126,24 @@ public final class PanicResponder {
     }
 
     /**
-     * Returns the default value of a type: {@code null} for references and {@code void}, zero or
-     * {@code false} for primitives.
+     * Returns the value an intercepted method returns after a handled failure:
+     * <ul>
+     *   <li>zero or {@code false} for primitives;</li>
+     *   <li>an empty value for {@link Optional} (and its primitive variants);</li>
+     *   <li>an empty immutable collection when the declared type is exactly {@link List},
+     *       {@link Collection}, {@link Iterable}, {@link Set} or {@link Map};</li>
+     *   <li>{@code null} for every other reference type and for {@code void}.</li>
+     * </ul>
      *
-     * @param type the type; may be {@code null}
+     * @param type the declared return type; may be {@code null}
      * @return the default value
      */
     public static Object defaultValue(Class<?> type) {
-        if (type == null || !type.isPrimitive() || type == void.class) {
+        if (type == null || type == void.class) {
             return null;
+        }
+        if (!type.isPrimitive()) {
+            return emptyValue(type);
         }
         if (type == boolean.class) return false;
         if (type == byte.class) return (byte) 0;
@@ -135,5 +153,16 @@ public final class PanicResponder {
         if (type == float.class) return 0.0f;
         if (type == double.class) return 0.0d;
         return '\u0000'; // char
+    }
+
+    private static Object emptyValue(Class<?> type) {
+        if (type == Optional.class) return Optional.empty();
+        if (type == OptionalInt.class) return OptionalInt.empty();
+        if (type == OptionalLong.class) return OptionalLong.empty();
+        if (type == OptionalDouble.class) return OptionalDouble.empty();
+        if (type == List.class || type == Collection.class || type == Iterable.class) return List.of();
+        if (type == Set.class) return Set.of();
+        if (type == Map.class) return Map.of();
+        return null;
     }
 }

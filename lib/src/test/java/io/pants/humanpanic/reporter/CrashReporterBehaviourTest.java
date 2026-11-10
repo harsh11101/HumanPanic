@@ -59,6 +59,17 @@ class CrashReporterBehaviourTest {
     }
 
     @Test
+    void reportIsReadableByOwnerOnlyOnPosixFileSystems() throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
+
+        Path report = Path.of(reporter().createReport(new RuntimeException("secret"), null));
+
+        assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(
+                Files.getPosixFilePermissions(report)));
+    }
+
+    @Test
     void concurrentFailuresProduceDistinctFiles() throws Exception {
         // Regression (B3): reports used to be named by the second and overwrite each other.
         CrashReporter reporter = reporter();
@@ -130,6 +141,18 @@ class CrashReporterBehaviourTest {
         assertEquals(AppMetadata.DEFAULT_NAME, report.get("name").asText());
         assertEquals(AppMetadata.DEFAULT_VERSION, report.get("version").asText());
         assertFalse(report.get("application_info").has("authors"));
+    }
+
+    @Test
+    void blankNameAndVersionFallBackToDefaults() throws Exception {
+        AppMetadata m = new AppMetadata();
+        m.setName("  ");
+        m.setVersion("");
+
+        JsonNode report = read(new CrashReporter(m, dir).createReport(new RuntimeException(), null));
+
+        assertEquals(AppMetadata.DEFAULT_NAME, report.get("name").asText());
+        assertEquals(AppMetadata.DEFAULT_VERSION, report.get("version").asText());
     }
 
     @Test

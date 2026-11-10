@@ -1,5 +1,6 @@
 # HumanPanic
 
+[![CI](https://github.com/harsh11101/HumanPanic/actions/workflows/ci.yml/badge.svg)](https://github.com/harsh11101/HumanPanic/actions/workflows/ci.yml)
 [![](https://jitpack.io/v/harsh11101/HumanPanic.svg)](https://jitpack.io/#harsh11101/HumanPanic)
 
 **Human-friendly crash handling for Java applications**, inspired by Rust's
@@ -199,8 +200,9 @@ try {
 | `printStackTrace` | `false` | Also print the raw stack trace to the message stream (useful in development). |
 | `exitCode` | `0` | If not `0`, call `System.exit(exitCode)` after reporting. |
 
-> **The exception is swallowed.** After handling, an intercepted method returns its type's
-> default value (`null`, `0`, `false`) unless `exitCode` ends the process. Use it only at boundaries
+> **The exception is swallowed.** After handling, an intercepted method returns a default value
+> unless `exitCode` ends the process: `0` or `false` for primitives, an empty value for `Optional`,
+> `List`, `Collection`, `Iterable`, `Set` and `Map`, and `null` for everything else. Use it only at boundaries
 > where "report and continue" or "report and exit" is really what you want. Two exceptions:
 > a `VirtualMachineError` (`OutOfMemoryError`, `StackOverflowError`, ...) is reported and then
 > **rethrown**, and an `InterruptedException` has the thread's interrupt flag restored.
@@ -237,7 +239,13 @@ The metadata can come from three places:
 | `reportDirectory(Path)` | `./crash-reports` (created when the first report is written) |
 | `output(PrintStream)` | `System.err` (looked up when each message is written) |
 
-The Spring integration writes to `./crash-reports` and `System.err`.
+### Spring settings
+
+| Property | Default | Effect |
+|---|---|---|
+| `humanpanic.report-dir` | `crash-reports` | Directory the crash reports are written to. |
+
+Messages go to `System.err`.
 
 ## Crash reports
 
@@ -277,19 +285,21 @@ read a report back with `objectMapper.readValue(file, CrashReport.class)`.
   interfaces. Native AspectJ weaving (ajc or load-time weaving) is **not supported**.
 * **Constructors.** `@HumanPanic` is allowed on constructors only for compatibility with 1.x. It has
   no effect there.
-* **Swallowed exceptions.** Methods returning `Optional` or collections get `null` after a handled
-  failure, not an empty value.
+* **Swallowed exceptions.** After a handled failure, a method declared to return a concrete or
+  specialised collection type (`ArrayList`, `SortedSet`, ...) or any other object gets `null`. Only
+  `Optional`, `List`, `Collection`, `Iterable`, `Set` and `Map` get an empty value.
 * **Exit codes.** `exitCode` calls `System.exit`. That runs shutdown hooks, and can deadlock if a
   shutdown hook waits for the thread that is exiting.
-* **Report contents.** Reports contain exception messages and stack traces. They may include
-  sensitive data and are written with the process's default file permissions.
+* **Report contents.** Reports contain exception messages and stack traces, which may include
+  sensitive data. On Linux and macOS each report is readable by its owner only (`rw-------`). On
+  Windows it inherits the permissions of the report directory.
 * **Fixed message text.** The message is in English, and its wording cannot be changed yet.
-* **Spring defaults.** The Spring integration always uses `./crash-reports` and `System.err`.
+* **Spring output.** The Spring integration always writes messages to `System.err`.
 
 ## Building and testing
 
 ```bash
-./gradlew build                          # compile, 245 tests, javadoc, sources jar
+./gradlew build                          # compile, run all tests, javadoc, sources jar
 ./gradlew :lib:publishToMavenLocal       # install 2.0.0 into ~/.m2 (used by the demo)
 ```
 
