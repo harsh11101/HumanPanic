@@ -1,0 +1,18 @@
+// Standalone build: consumes HumanPanic as an external dependency, exactly like a user would.
+// It resolves from Maven Local first (./gradlew :lib:publishToMavenLocal from the repository
+// root), then from JitPack (a released tag), so it works before and after a release.
+dependencyResolutionManagement {
+    repositories {
+        mavenLocal {
+            content { includeGroup 'com.github.harsh11101' }
+        }
+        maven {
+            url = 'https://jitpack.io'
+            content { includeGroup 'com.github.harsh11101' }
+        }
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'humanpanic-demo'
+include 'cli-app', 'picocli-app', 'jcommander-app', 'commons-cli-app', 'spring-app'

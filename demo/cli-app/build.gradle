@@ -1,0 +1,18 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    // The only dependency. No Spring, no AspectJ: proves the core is dependency-free.
+    implementation "com.github.harsh11101:HumanPanic:${humanPanicVersion}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.compilerArgs += ['-Xlint:all']
+}
+
+application {
+    mainClass = 'com.example.csvstat.Main'
+    applicationName = 'csvstat'
+}

@@ -1,0 +1,19 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation "com.github.harsh11101:HumanPanic:${humanPanicVersion}"
+    implementation 'org.jcommander:jcommander:2.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    // -processing: JCommander annotations are read by reflection, not by an annotation processor.
+    options.compilerArgs += ['-Xlint:all,-processing']
+}
+
+application {
+    mainClass = 'com.example.salesavg.SalesAvg'
+    applicationName = 'salesavg'
+}

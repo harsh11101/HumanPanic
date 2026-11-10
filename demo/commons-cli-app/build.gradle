@@ -1,0 +1,18 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation "com.github.harsh11101:HumanPanic:${humanPanicVersion}"
+    implementation 'commons-cli:commons-cli:1.9.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.compilerArgs += ['-Xlint:all']
+}
+
+application {
+    mainClass = 'com.example.salesmax.SalesMax'
+    applicationName = 'salesmax'
+}

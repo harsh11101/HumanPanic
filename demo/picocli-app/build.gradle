@@ -1,0 +1,19 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation "com.github.harsh11101:HumanPanic:${humanPanicVersion}"
+    implementation 'info.picocli:picocli:4.7.7'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    // -processing: picocli annotations are read by reflection here, not by an annotation processor.
+    options.compilerArgs += ['-Xlint:all,-processing']
+}
+
+application {
+    mainClass = 'com.example.salesctl.SalesCtl'
+    applicationName = 'salesctl'
+}

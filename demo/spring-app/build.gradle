@@ -1,0 +1,21 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation "com.github.harsh11101:HumanPanic:${humanPanicVersion}"
+    // The Spring integration needs these on the application's classpath; HumanPanic does not
+    // bring them in transitively.
+    implementation 'org.springframework:spring-context:6.2.12'
+    implementation 'org.aspectj:aspectjweaver:1.9.24'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.compilerArgs += ['-Xlint:all']
+}
+
+application {
+    mainClass = 'com.example.notify.NotifyApp'
+    applicationName = 'notify'
+}
