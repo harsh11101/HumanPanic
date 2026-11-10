@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: JDK ${{ matrix.java }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        java: [17, 21]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Compile, run all tests, build javadoc and sources jars, then publish for the demo build.
+      - name: Build and test the library
+        run: ./gradlew build :lib:publishToMavenLocal
+
+      # The demo is a separate build that consumes the published jar like an external project.
+      - name: Build the demo applications
+        run: ./gradlew -p demo installDist
+
+      - name: Smoke-test the demo CLIs
+        run: |
+          expect() {   # expect <exit status> <command...>
+            local want=$1; shift
+            local got=0
+            "$@" || got=$?
+            if [ "$got" -ne "$want" ]; then
+              echo "::error::expected exit $want but got $got: $*"
+              exit 1
+            fi
+          }
+          expect 0  demo/cli-app/build/install/csvstat/bin/csvstat stats demo/data/sales.csv
+          expect 1  demo/cli-app/build/install/csvstat/bin/csvstat stats demo/data/sales-corrupt.csv
+          expect 2  demo/cli-app/build/install/csvstat/bin/csvstat import demo/data/sales-corrupt.csv
+          expect 1  demo/picocli-app/build/install/salesctl/bin/salesctl total demo/data/sales-corrupt.csv
+          expect 2  demo/picocli-app/build/install/salesctl/bin/salesctl total no-such-file.csv
+          expect 1  demo/jcommander-app/build/install/salesavg/bin/salesavg demo/data/sales-corrupt.csv
+          expect 70 demo/commons-cli-app/build/install/salesmax/bin/salesmax demo/data/sales-corrupt.csv
+          expect 0  demo/spring-app/build/install/notify/bin/notify
+          test -n "$(ls crash-reports/*.json)"
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.os }}-jdk${{ matrix.java }}
+          path: lib/build/reports/tests/
